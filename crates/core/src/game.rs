@@ -33,6 +33,8 @@ pub struct Game {
     pub outcome: Outcome,
     /// If false, rocket B coasts (no AI) — handy for tests / 2-human play.
     pub ai_enabled: bool,
+    /// The action the AI applied on the most recent step (for HUD/flame display).
+    pub last_ai_action: Action,
 }
 
 impl Game {
@@ -58,6 +60,7 @@ impl Game {
             },
             outcome: Outcome::Playing,
             ai_enabled: true,
+            last_ai_action: Action::default(),
         }
     }
 
@@ -81,6 +84,7 @@ impl Game {
         } else {
             Action::default()
         };
+        self.last_ai_action = ai;
 
         self.world.step(&[player, ai]);
         self.outcome = self.evaluate();

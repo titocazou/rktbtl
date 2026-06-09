@@ -12,6 +12,7 @@ const ctx = cv.getContext('2d');
 const W = cv.width, H = cv.height;
 let snap = game.snapshot();
 const SCALE = W / snap.world_w;
+const FUEL_MAX = (snap.rockets[0] && snap.rockets[0].fuel) || 100;
 const toPx = (x, y) => [x * SCALE, H - y * SCALE];
 function b2w(r, bx, by) {
   const s = Math.sin(r.th), c = Math.cos(r.th);
@@ -20,14 +21,14 @@ function b2w(r, bx, by) {
 
 const keys = { left: false, right: false };
 addEventListener('keydown', e => {
-  if (e.key === 'ArrowLeft') keys.left = true;
-  if (e.key === 'ArrowRight') keys.right = true;
+  if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
   if (e.key === 'r' || e.key === 'R') rematch();
   if ([' ', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
 });
 addEventListener('keyup', e => {
-  if (e.key === 'ArrowLeft') keys.left = false;
-  if (e.key === 'ArrowRight') keys.right = false;
+  if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
+  if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
 });
 document.getElementById('reset').onclick = rematch;
 function rematch() { game.reset(); document.getElementById('banner').classList.remove('show'); applyParams(); }
@@ -65,15 +66,24 @@ function drawRocket(r, i) {
   ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(0, -h / 2 - w * 0.7); ctx.lineTo(w / 2, -h / 2);
   ctx.closePath(); ctx.fill();
 
-  // flames: only the player rocket shows precise throttle (we know its input).
-  if (r.side === 0) {
-    const thr = game.player_throttle();
-    const dpx = 0.28 * SCALE;
-    ctx.fillStyle = '#ffb13a';
-    if (thr[0] > 0.02) flame(-dpx, h / 2, thr[0]);
-    if (thr[1] > 0.02) flame(dpx, h / 2, thr[1]);
-  }
+  // flames: precise per-side throttle (player from our input, AI from its last action).
+  const thr = r.side === 0 ? game.player_throttle() : game.opp_throttle();
+  const dpx = 0.28 * SCALE;
+  ctx.fillStyle = '#ffb13a';
+  if (thr[0] > 0.02) flame(-dpx, h / 2, thr[0]);
+  if (thr[1] > 0.02) flame(dpx, h / 2, thr[1]);
   ctx.restore();
+
+  // fuel bar floating above the rocket (horizontal in screen space, green -> orange -> red as it drains)
+  if (!dead) {
+    const f = Math.max(0, Math.min(1, r.fuel / FUEL_MAX));
+    const bw = w * 1.4, bh = 5;
+    const bx = cx - bw / 2, by = cy - h * 0.5 - w * 0.7 - 12;
+    ctx.fillStyle = 'rgba(6,9,16,.55)'; ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+    ctx.fillStyle = '#1a222e'; ctx.fillRect(bx, by, bw, bh);
+    ctx.fillStyle = f > 0.5 ? COL.good : f > 0.2 ? '#ffb13a' : COL.opp;
+    ctx.fillRect(bx, by, bw * f, bh);
+  }
 }
 
 // Simple kickstands: one thin rod from each lower corner out to the foot.
@@ -135,6 +145,8 @@ function updateHUD() {
   setBar('aStb', a.stable_time, 1); setBar('bStb', b.stable_time, 1);
   const thr = game.player_throttle();
   setBar('aTl', thr[0] * 100); setBar('aTr', thr[1] * 100);
+  const othr = game.opp_throttle();
+  setBar('bTl', othr[0] * 100); setBar('bTr', othr[1] * 100);
 
   if (snap.outcome !== 'playing' && snap.outcome !== '') {
     const banner = $('banner'), text = $('bannerText');

@@ -291,6 +291,18 @@ impl GameSim {
         ]
     }
 
+    /// Throttles the AI applied to its rocket (B) on the last step — for HUD bars
+    /// and engine flames, gated by the same firing condition as the player.
+    pub fn opp_throttle(&self) -> Vec<f64> {
+        let r = &self.game.world.rockets[1];
+        let firing = r.status == Status::Flying && (self.game.world.cfg.infinite_fuel || r.fuel > 0.0);
+        let a = self.game.last_ai_action;
+        vec![
+            if firing { a.tl } else { 0.0 },
+            if firing { a.tr } else { 0.0 },
+        ]
+    }
+
     pub fn snapshot(&self) -> JsValue {
         // pad 0 belongs to A, pad 1 to B
         let state = render_state(&self.game.world, outcome_str(self.game.outcome), &[0, 1]);

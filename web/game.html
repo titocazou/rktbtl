@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>RKTBTL — rocket battle</title>
+<title>RKT.BTL · rocket battle</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Major+Mono+Display&family=Space+Mono:wght@400;700&display=swap');
   :root{--bg:#0a0e14;--panel:#11161f;--ink:#c9d6e3;--dim:#5a6b80;--accent:#ff5e3a;--good:#3ddc97;--grid:#1a222e;--warn:#ffb13a;--player:#5ec8ff;}
@@ -39,7 +39,7 @@
 </style>
 </head>
 <body>
-  <h1>rktbtl</h1>
+  <h1>rkt.btl</h1>
   <div class="sub">land on the <b style="color:var(--accent)">orange</b> (opponent) pad before the AI lands on <b style="color:var(--player)">yours</b><span id="sandboxLink"> · <a href="./index.html">sandbox →</a></span></div>
   <div class="wrap">
     <div class="stage">
@@ -64,6 +64,9 @@
         <div class="row"><span class="k">fuel</span><span class="v" id="bFuel" style="color:var(--accent)">100</span></div>
         <div class="row"><span class="k">stable</span><span class="v" id="bStable" style="color:var(--accent)">0.00 s</span></div>
         <div class="bar"><i id="bStb" style="background:var(--accent)"></i></div>
+        <div class="row" style="margin-top:6px"><span class="k">L / R thrust</span></div>
+        <div class="bar"><i id="bTl" style="background:var(--accent)"></i></div>
+        <div class="bar" style="margin-top:3px"><i id="bTr" style="background:var(--accent)"></i></div>
       </div>
       <div class="card" id="tuneCard">
         <div class="row"><span class="k">bounce (restitution)</span><span class="v" id="restVal">0.35</span></div>
@@ -71,7 +74,7 @@
         <div class="row" style="margin-top:6px"><span class="k">crush speed (m/s)</span><span class="v" id="crushVal">3.0</span></div>
         <input type="range" id="crush" min="0" max="8" step="0.5" value="3" style="width:100%;accent-color:#ff5e3a">
       </div>
-      <div class="keys"><b>← →</b> your left / right booster<br><b>both</b> = pure thrust · ram the AI's <b>engines</b> (red) hard to kill it<br>your <b>gold nose</b> is indestructible · hulls are solid · <b>R</b> rematch</div>
+      <div class="keys"><b>← →</b> or <b>A D</b> your left / right booster<br><b>both</b> = pure thrust · ram the AI's <b>engines</b> (red) hard to kill it<br>your <b>gold nose</b> is indestructible · hulls are solid · <b>R</b> rematch</div>
       <button id="reset">REMATCH ⟳</button>
     </div>
   </div>
@@ -81,11 +84,11 @@
     if (location.protocol === 'file:') {
       document.body.innerHTML =
         '<div style="max-width:640px;margin:12vh auto;color:#c9d6e3;font-family:monospace;line-height:1.8">' +
-        '<h2 style="color:#5ec8ff">serve this over http — don’t open the file directly</h2>' +
+        '<h2 style="color:#5ec8ff">serve this over http, don’t open the file directly</h2>' +
         '<p>The Rust/WASM core can’t load from a <code>file://</code> URL. From the project root run:</p>' +
         '<pre style="background:#11161f;padding:14px;border:1px solid #1a222e">python3 -m http.server 8011 --directory web</pre>' +
         '<p>then open <a style="color:#5ec8ff" href="http://localhost:8011/game.html">http://localhost:8011/game.html</a></p></div>';
-      throw new Error('opened via file:// — serve over http instead');
+      throw new Error('opened via file://, serve over http instead');
     }
   </script>
   <script>
