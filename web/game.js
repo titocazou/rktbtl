@@ -115,15 +115,9 @@ function updateRatios() {
 }
 
 function rematch() {
-  if (!mode) return;
-  // Fresh engine, so a reset always returns to the config.rs defaults. Slider
-  // tweaks are temporary live overrides and are cleared here.
-  if (engine && engine.free) engine.free();
-  engine = mode === 'solo' ? new Sim() : new GameSim();
-  snap = engine.snapshot();
-  legAnim[0] = legAnim[1] = 0;
+  if (!engine) return;
+  engine.reset(); // keeps the current cfg, so slider tweaks persist across a reset
   $('banner').classList.remove('show');
-  syncSlidersFromEngine();
 }
 $('reset').onclick = rematch;
 
