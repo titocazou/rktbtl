@@ -5,7 +5,7 @@ import init, { Sim, GameSim } from './pkg/rocket_wasm.js';
 const DT = 1 / 60;
 const COL = { player: '#5ec8ff', opp: '#ff5e3a', good: '#3ddc97', dim: '#8aa0b8', gold: '#f2c14e' };
 
-await init(new URL('./pkg/rocket_wasm_bg.wasm?v=4', import.meta.url));
+await init(new URL('./pkg/rocket_wasm_bg.wasm?v=5', import.meta.url));
 
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
@@ -217,8 +217,12 @@ function flame(bx, by, mag) {
 function drawPad(p) {
   const col = p.owner === 0 ? COL.player : COL.opp;
   const [plx, pty] = toPx(p.cx - p.half_w, p.y + p.thick);
+  // pad is a solid capsule (pill): full-width rounded slab, fully rounded ends
+  const pw = p.half_w * 2 * SCALE, ph = p.thick * SCALE;
   ctx.fillStyle = col;
-  ctx.fillRect(plx, pty, p.half_w * 2 * SCALE, p.thick * SCALE);
+  ctx.beginPath();
+  ctx.roundRect(plx, pty, pw, ph, ph / 2);
+  ctx.fill();
   ctx.strokeStyle = p.owner === 0 ? 'rgba(94,200,255,.25)' : 'rgba(255,94,58,.25)'; ctx.lineWidth = 2;
   const [l1] = toPx(p.cx - p.half_w * 0.6, 0);
   const [l2] = toPx(p.cx + p.half_w * 0.6, 0);

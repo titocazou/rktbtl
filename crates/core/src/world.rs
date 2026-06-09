@@ -247,6 +247,7 @@ impl World {
             integrate(&cfg, &self.pads, &mut self.rockets[i], act);
         }
         resolve_rocket_collisions(&cfg, &mut self.rockets);
+        resolve_pad_collisions(&cfg, &mut self.rockets, &self.pads);
         self.time += cfg.dt;
         self.steps += 1;
     }
@@ -264,6 +265,7 @@ pub fn step_isolated(cfg: &Cfg, pad: &Pad, r: &mut Rocket, action: Action) {
     r.target_pad = 0;
     let pads = core::slice::from_ref(pad);
     integrate(cfg, pads, r, action);
+    resolve_pad_collisions(cfg, core::slice::from_mut(r), pads);
     r.target_pad = saved_target;
 }
 
@@ -455,14 +457,8 @@ fn integrate(cfg: &Cfg, pads: &[Pad], r: &mut Rocket, action: Action) {
         r.vy = r.vy.min(0.0);
     }
 
-    // body (not feet) slamming into a pad's top face at speed → explode. Only
-    // the slab band counts, so flying *under* a pad at speed is fine.
-    for p in pads {
-        if p.over(bottom.x) && bottom.y <= p.top() && bottom.y >= p.y && r.speed() > cfg.v_explode {
-            die(r, DeathCause::BodySlam);
-            return;
-        }
-    }
+    // (Body-vs-pad solidity and the hard-hit death are handled by the static
+    // pad-capsule collision in `resolve_pad_collisions`, run after integration.)
 
     // --- stable-landing win timer (only the target pad wins) ---
     let stable = feet_down_target >= 2
@@ -602,6 +598,75 @@ fn mut_pair<T>(s: &mut [T], i: usize, j: usize) -> (&mut T, &mut T) {
 /// Is point `p` (closest point on a hull) on the bottom half of segment
 /// `[bottom, top]`? Parametrise t∈[0,1] from bottom→top; bottom half is t<0.5.
 #[inline]
+/// Resolve each rocket hull against the pads, treating every pad as a STATIC
+/// (immovable) capsule: a horizontal centreline of radius `thick/2`. Only the
+/// rocket responds, the pad never moves. The indestructible gold nose (top
+/// half) survives any pad hit; a hard contact on the engine (bottom) half
+/// destroys the rocket.
+fn resolve_pad_collisions(cfg: &Cfg, rockets: &mut [Rocket], pads: &[Pad]) {
+    let inv_m = 1.0 / cfg.m;
+    let inv_i = 1.0 / cfg.inertia();
+    for r in rockets.iter_mut() {
+        if !r.alive() {
+            continue;
+        }
+        for p in pads {
+            let pad_r = p.thick * 0.5;
+            let sep = cfg.hull_r + pad_r;
+            // pad capsule centreline, caps tucked inside the slab footprint
+            let half = (p.half_w - pad_r).max(0.0);
+            let cy = p.y + pad_r;
+            let pa = Vec2::new(p.cx - half, cy);
+            let pb = Vec2::new(p.cx + half, cy);
+
+            let (h0, h1) = (r.hull_bottom(cfg), r.hull_top(cfg));
+            let (d_sq, cp_h) = seg_seg_closest(h0, h1, pa, pb);
+            if d_sq > sep * sep {
+                continue;
+            }
+            let (_, cp_p) = seg_seg_closest(pa, pb, h0, h1);
+
+            // contact normal: from the pad surface toward the rocket
+            let mut nrm = cp_h.sub(cp_p);
+            if nrm.len_sq() < 1e-12 {
+                nrm = Vec2::new(r.x - p.cx, r.y - cy);
+            }
+            let nlen = nrm.len();
+            if nlen < 1e-9 {
+                continue;
+            }
+            let nrm = nrm.scale(1.0 / nlen);
+
+            let cp = cp_h.add(cp_p).scale(0.5);
+            let ra = Vec2::new(cp.x - r.x, cp.y - r.y);
+            let vrel_n = r.point_vel(ra).dot(nrm);
+            let impact = (-vrel_n).max(0.0);
+            let ran = ra.x * nrm.y - ra.y * nrm.x; // r × n (scalar)
+
+            // normal impulse: the pad is immovable, so only the rocket's own
+            // effective mass appears in the denominator.
+            if vrel_n < 0.0 {
+                let denom = inv_m + ran * ran * inv_i;
+                let jimp = -(1.0 + cfg.rocket_restitution) * vrel_n / denom;
+                r.vx += jimp * nrm.x * inv_m;
+                r.vy += jimp * nrm.y * inv_m;
+                r.om += ran * jimp * inv_i;
+            }
+            // positional correction: push the rocket fully out of the pad
+            let pen = sep - nlen;
+            if pen > 0.0 {
+                r.x += nrm.x * pen;
+                r.y += nrm.y * pen;
+            }
+            // gated destruction: a hard hit on the engine (bottom) half kills;
+            // the gold nose is invincible.
+            if impact >= cfg.rocket_crush_speed && in_bottom_half(cp_h, h0, h1) {
+                die(r, DeathCause::BodySlam);
+            }
+        }
+    }
+}
+
 fn in_bottom_half(p: Vec2, bottom: Vec2, top: Vec2) -> bool {
     let axis = top.sub(bottom);
     let len_sq = axis.len_sq();
