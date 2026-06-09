@@ -3,7 +3,7 @@
 import init, { Sim, GameSim } from './pkg/rocket_wasm.js';
 
 const DT = 1 / 60;
-const COL = { player: '#5ec8ff', opp: '#ff5e3a', good: '#3ddc97', dim: '#8aa0b8', gold: '#f2c14e' };
+const COL = { player: '#5ec8ff', opp: '#ff5e3a', good: '#3ddc97', dim: '#8aa0b8', gold: '#f2c14e', dead: '#737b85' };
 
 await init(new URL('./pkg/rocket_wasm_bg.wasm?v=9', import.meta.url));
 
@@ -161,8 +161,8 @@ function throttleFor(r) {
 
 function drawRocket(r, i) {
   const dead = r.status === 'dead', landed = r.status === 'landed';
-  const topCol = dead ? COL.opp : landed ? COL.good : COL.gold;
-  const botCol = dead ? COL.opp : landed ? COL.good : (r.side === 0 ? COL.player : COL.opp);
+  const topCol = dead ? COL.dead : landed ? COL.good : COL.gold;
+  const botCol = dead ? COL.dead : landed ? COL.good : (r.side === 0 ? COL.player : COL.opp);
   const target = r.legs_out ? 1 : 0;
   legAnim[i] += (target - legAnim[i]) * 0.25;
   if (legAnim[i] > 0.02) drawLegs(r, i);
@@ -203,7 +203,7 @@ function drawRocket(r, i) {
 
 // Simple kickstands: one thin rod from each lower corner out to the foot.
 function drawLegs(r, i) {
-  ctx.strokeStyle = r.status === 'dead' ? COL.opp : COL.dim;
+  ctx.strokeStyle = r.status === 'dead' ? COL.dead : COL.dim;
   ctx.lineCap = 'round';
   ctx.lineWidth = 2;
   for (let k = 0; k < 2; k++) {
