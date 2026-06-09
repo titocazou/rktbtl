@@ -12,7 +12,6 @@
        background-image:radial-gradient(circle at 20% 10%,rgba(94,200,255,.05),transparent 40%),radial-gradient(circle at 80% 90%,rgba(255,94,58,.05),transparent 40%);}
   h1{font-family:'Major Mono Display',monospace;font-size:1.6rem;letter-spacing:.15em;font-weight:400;margin-bottom:4px;}
   .sub{color:var(--dim);font-size:.72rem;letter-spacing:.05em;margin-bottom:18px;}
-  .sub a{color:var(--dim);}
   .wrap{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;justify-content:center;}
   .stage{border:1px solid var(--grid);background:#060910;position:relative;box-shadow:0 0 0 1px #000,0 20px 60px rgba(0,0,0,.5);}
   canvas{display:block;}
@@ -29,60 +28,143 @@
   .card.player{border-color:rgba(94,200,255,.4);} .card.opp{border-color:rgba(255,94,58,.4);}
   .bar{height:5px;background:var(--grid);margin-top:3px;position:relative;}
   .bar>i{position:absolute;left:0;top:0;bottom:0;display:block;}
-  .keys{margin-top:6px;color:var(--dim);font-size:.66rem;line-height:1.7;}
+  .keys{margin-top:8px;color:var(--dim);font-size:.66rem;line-height:1.7;}
   .keys b{color:var(--ink);}
   button{width:100%;margin-top:10px;background:transparent;color:var(--ink);border:1px solid var(--dim);padding:8px;font-family:inherit;font-size:.7rem;letter-spacing:.15em;cursor:pointer;transition:all .15s;}
   button:hover{border-color:var(--player);color:var(--player);}
-  /* embed mode (loaded in an overlay on the website): hide the collision
-     tuning sliders and the sandbox link, keep the rest of the full UI. */
-  body.embed #tuneCard, body.embed #sandboxLink { display: none; }
+  button.back{margin-top:0;margin-bottom:12px;letter-spacing:.1em;}
+  .aitoggle{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:.66rem;color:var(--dim);letter-spacing:.05em;margin-bottom:12px;cursor:pointer;}
+  /* solo: tuning sliders, ratios, telemetry */
+  .slider{margin-bottom:12px;}
+  .slider label{display:flex;justify-content:space-between;color:var(--dim);margin-bottom:4px;}
+  .slider label b{color:var(--ink);font-weight:400;}
+  .slider input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:3px;background:var(--grid);outline:none;}
+  .slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;background:var(--accent);cursor:pointer;border-radius:50%;}
+  .ratios{margin:8px 0 4px;padding-top:12px;border-top:1px solid var(--grid);}
+  .ratios .v{color:var(--warn);font-weight:700;}
+  .status{margin:12px 0 0;padding:8px;text-align:center;letter-spacing:.1em;border:1px solid var(--grid);}
+  .status.flying{color:var(--ink);}
+  .status.landed{color:var(--good);border-color:var(--good);}
+  .status.dead{color:var(--accent);border-color:var(--accent);}
+  /* main menu */
+  .menu{width:min(92vw,560px);background:var(--panel);border:1px solid var(--grid);padding:28px;box-shadow:0 20px 60px rgba(0,0,0,.5);}
+  .menu-title{font-size:.66rem;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin-bottom:18px;text-align:center;}
+  .menu-options{display:flex;gap:16px;flex-wrap:wrap;justify-content:center;}
+  .menu-col{flex:1;min-width:210px;display:flex;flex-direction:column;gap:10px;}
+  .menu-btn{width:100%;margin:0;display:flex;flex-direction:column;gap:4px;align-items:flex-start;padding:16px;border:1px solid var(--dim);background:transparent;text-align:left;}
+  .menu-btn .t{font-size:1rem;letter-spacing:.1em;color:var(--ink);}
+  .menu-btn .d{font-size:.64rem;color:var(--dim);letter-spacing:.04em;text-transform:none;}
+  .menu-btn:hover{border-color:var(--player);}
+  .menu-btn:hover .t{color:var(--player);}
+  .menu-ai{display:flex;flex-direction:column;gap:6px;font-size:.6rem;letter-spacing:.12em;color:var(--dim);text-transform:uppercase;}
+  .menu-ai select{background:#0a0e14;color:var(--ink);border:1px solid var(--grid);padding:7px;font-family:inherit;font-size:.7rem;cursor:pointer;}
 </style>
 </head>
 <body>
   <h1>rkt.btl</h1>
-  <div class="sub">land on the <b style="color:var(--accent)">orange</b> (opponent) pad before the AI lands on <b style="color:var(--player)">yours</b><span id="sandboxLink"> · <a href="./index.html">sandbox →</a></span></div>
-  <div class="wrap">
+  <div class="sub">a 2D rocket game · rust core (wasm)</div>
+
+  <!-- main menu -->
+  <div class="menu" id="menu">
+    <div class="menu-title">choose a mode</div>
+    <div class="menu-options">
+      <div class="menu-col">
+        <button class="menu-btn" id="modeSolo">
+          <span class="t">Solo</span>
+          <span class="d">fly freely and tune the physics</span>
+        </button>
+      </div>
+      <div class="menu-col">
+        <button class="menu-btn" id="modeVs">
+          <span class="t">Vs AI</span>
+          <span class="d">race the AI to its pad</span>
+        </button>
+        <label class="menu-ai">opponent
+          <select id="aiSelect"><option value="pd">naive (PD control)</option></select>
+        </label>
+      </div>
+    </div>
+  </div>
+
+  <!-- game -->
+  <div class="wrap" id="game" style="display:none">
     <div class="stage">
       <canvas id="cv" width="720" height="520"></canvas>
       <div class="banner" id="banner"><h2 id="bannerText"></h2><small>press <b>R</b> or click rematch</small></div>
     </div>
     <div class="hud">
-      <label class="aitoggle" style="display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:.66rem;color:var(--dim);letter-spacing:.05em;margin-bottom:12px;cursor:pointer;">
-        <input type="checkbox" id="showAI" style="accent-color:var(--accent);cursor:pointer;"> Display AI controls
-      </label>
-      <h2 class="lbl">Match</h2>
-      <div class="card player">
-        <div class="row"><span class="k">YOU (land right pad)</span></div>
-        <div class="row"><span class="k">status</span><span class="v" id="aStatus">flying</span></div>
-        <div class="row"><span class="k">fuel</span><span class="v" id="aFuel">100</span></div>
-        <div class="row"><span class="k">stable</span><span class="v" id="aStable">0.00 s</span></div>
-        <div class="bar"><i id="aStb" style="background:var(--player)"></i></div>
-        <div class="row" style="margin-top:6px"><span class="k">L / R thrust</span></div>
-        <div class="bar"><i id="aTl" style="background:var(--player)"></i></div>
-        <div class="bar" style="margin-top:3px"><i id="aTr" style="background:var(--player)"></i></div>
-      </div>
-      <div class="card opp">
-        <div class="row"><span class="k">AI (lands your pad)</span></div>
-        <div class="row"><span class="k">status</span><span class="v" id="bStatus" style="color:var(--accent)">flying</span></div>
-        <div class="row"><span class="k">fuel</span><span class="v" id="bFuel" style="color:var(--accent)">100</span></div>
-        <div class="row"><span class="k">stable</span><span class="v" id="bStable" style="color:var(--accent)">0.00 s</span></div>
-        <div class="bar"><i id="bStb" style="background:var(--accent)"></i></div>
-        <div id="bThrustBlock" style="display:none">
+      <button class="back" id="backMenu">‹ menu</button>
+
+      <!-- versus panel -->
+      <div id="vsPanel" style="display:none">
+        <label class="aitoggle"><input type="checkbox" id="showAI" style="accent-color:var(--accent);cursor:pointer;"> Display AI controls</label>
+        <h2 class="lbl">Match</h2>
+        <div class="card player">
+          <div class="row"><span class="k">YOU (land right pad)</span></div>
+          <div class="row"><span class="k">status</span><span class="v" id="aStatus">flying</span></div>
+          <div class="row"><span class="k">fuel</span><span class="v" id="aFuel">100</span></div>
+          <div class="row"><span class="k">stable</span><span class="v" id="aStable">0.00 s</span></div>
+          <div class="bar"><i id="aStb" style="background:var(--player)"></i></div>
           <div class="row" style="margin-top:6px"><span class="k">L / R thrust</span></div>
-          <div class="bar"><i id="bTl" style="background:var(--accent)"></i></div>
-          <div class="bar" style="margin-top:3px"><i id="bTr" style="background:var(--accent)"></i></div>
+          <div class="bar"><i id="aTl" style="background:var(--player)"></i></div>
+          <div class="bar" style="margin-top:3px"><i id="aTr" style="background:var(--player)"></i></div>
         </div>
+        <div class="card opp">
+          <div class="row"><span class="k">AI (lands your pad)</span></div>
+          <div class="row"><span class="k">status</span><span class="v" id="bStatus" style="color:var(--accent)">flying</span></div>
+          <div class="row"><span class="k">fuel</span><span class="v" id="bFuel" style="color:var(--accent)">100</span></div>
+          <div class="row"><span class="k">stable</span><span class="v" id="bStable" style="color:var(--accent)">0.00 s</span></div>
+          <div class="bar"><i id="bStb" style="background:var(--accent)"></i></div>
+          <div id="bThrustBlock" style="display:none">
+            <div class="row" style="margin-top:6px"><span class="k">L / R thrust</span></div>
+            <div class="bar"><i id="bTl" style="background:var(--accent)"></i></div>
+            <div class="bar" style="margin-top:3px"><i id="bTr" style="background:var(--accent)"></i></div>
+          </div>
+        </div>
+        <div class="card" id="tuneCard">
+          <div class="row"><span class="k">bounce (restitution)</span><span class="v" id="restVal">0.35</span></div>
+          <input type="range" id="rest" min="0" max="1" step="0.05" value="0.35" style="width:100%;accent-color:#f2c14e">
+          <div class="row" style="margin-top:6px"><span class="k">crush speed (m/s)</span><span class="v" id="crushVal">3.0</span></div>
+          <input type="range" id="crush" min="0" max="8" step="0.5" value="3" style="width:100%;accent-color:#ff5e3a">
+        </div>
+        <div class="keys"><b>← →</b> or <b>A D</b> your left / right booster<br><b>both</b> = pure thrust · ram the AI's <b>engines</b> (red) hard to kill it<br>your <b>gold nose</b> is indestructible · hulls are solid · <b>R</b> rematch</div>
       </div>
-      <div class="card" id="tuneCard">
-        <div class="row"><span class="k">bounce (restitution)</span><span class="v" id="restVal">0.35</span></div>
-        <input type="range" id="rest" min="0" max="1" step="0.05" value="0.35" style="width:100%;accent-color:#f2c14e">
-        <div class="row" style="margin-top:6px"><span class="k">crush speed (m/s)</span><span class="v" id="crushVal">3.0</span></div>
-        <input type="range" id="crush" min="0" max="8" step="0.5" value="3" style="width:100%;accent-color:#ff5e3a">
+
+      <!-- solo panel -->
+      <div id="soloPanel" style="display:none">
+        <h2 class="lbl">Tuning</h2>
+        <div class="slider"><label>mass <b><span id="lm">1.80</span> kg</b></label><input type="range" id="sm" min="0.3" max="4" step="0.05" value="1.8"></div>
+        <div class="slider"><label>thrust / booster <b><span id="lt">22</span> N</b></label><input type="range" id="st" min="5" max="60" step="1" value="22"></div>
+        <div class="slider"><label>booster offset d <b><span id="ld">0.28</span> m</b></label><input type="range" id="sd" min="0.05" max="0.6" step="0.01" value="0.28"></div>
+        <div class="slider"><label>inertia scale <b><span id="li">3.30</span>×</b></label><input type="range" id="si" min="0.2" max="4" step="0.05" value="3.3"></div>
+        <div class="slider"><label>leg stiffness k <b><span id="lk">400</span></b></label><input type="range" id="sk" min="200" max="2500" step="50" value="400"></div>
+        <div class="slider"><label>leg damping c <b><span id="lc">30</span></b></label><input type="range" id="sc" min="5" max="200" step="5" value="30"></div>
+        <div class="slider"><label>friction μ <b><span id="lmu">0.40</span></b></label><input type="range" id="smu" min="0.1" max="2.5" step="0.05" value="0.4"></div>
+        <div class="slider"><label>infinite fuel <b><span id="lif">off</span></b></label><input type="range" id="sif" min="0" max="1" step="1" value="0"></div>
+        <div class="ratios">
+          <div class="row"><span class="k">thrust / weight</span><span class="v" id="rtw">—</span></div>
+          <div class="row" style="margin-top:8px"><span class="k">ang. authority</span><span class="v" id="raa">—</span></div>
+        </div>
+        <h2 class="lbl" style="margin-top:14px">Telemetry</h2>
+        <div class="row"><span class="k">pos x, y</span><span class="v"><span id="px">0</span>, <span id="py">0</span></span></div>
+        <div class="row"><span class="k">vel</span><span class="v" id="vel">0</span></div>
+        <div class="row"><span class="k">angle</span><span class="v" id="ang">0</span></div>
+        <div class="row"><span class="k">ang vel</span><span class="v" id="om">0</span></div>
+        <div class="row"><span class="k">fuel</span><span class="v" id="fu">100</span></div>
+        <div class="row" style="margin-top:8px"><span class="k">L / R thrust</span></div>
+        <div class="bar"><i id="tlb" style="background:var(--warn)"></i></div>
+        <div class="bar" style="margin-top:3px"><i id="trb" style="background:var(--warn)"></i></div>
+        <div class="row" style="margin-top:8px"><span class="k">legs</span><span class="v" id="lg">stowed</span></div>
+        <div class="row" style="margin-top:4px"><span class="k">stable</span><span class="v" id="stv">0.00 s</span></div>
+        <div class="bar"><i id="stb" style="background:var(--good)"></i></div>
+        <div class="status flying" id="status">FLYING</div>
+        <div class="keys"><b>← →</b> or <b>A D</b> left / right booster<br><b>both</b> = pure thrust, no torque · <b>R</b> reset</div>
       </div>
-      <div class="keys"><b>← →</b> or <b>A D</b> your left / right booster<br><b>both</b> = pure thrust · ram the AI's <b>engines</b> (red) hard to kill it<br>your <b>gold nose</b> is indestructible · hulls are solid · <b>R</b> rematch</div>
+
       <button id="reset">REMATCH ⟳</button>
     </div>
   </div>
+
   <script>
     // WASM + ES modules can't load from file://. If opened by double-clicking,
     // show how to serve it instead of a silent black canvas.
@@ -95,10 +177,6 @@
         '<p>then open <a style="color:#5ec8ff" href="http://localhost:8011/game.html">http://localhost:8011/game.html</a></p></div>';
       throw new Error('opened via file://, serve over http instead');
     }
-  </script>
-  <script>
-    // `?embed` is set when this page is loaded inside the website overlay.
-    if (new URLSearchParams(location.search).has('embed')) document.body.classList.add('embed');
   </script>
   <script type="module" src="./game.js"></script>
 </body>

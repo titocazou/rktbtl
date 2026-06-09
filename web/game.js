@@ -1,24 +1,32 @@
-// Versus mode frontend: rendering + input only. Game logic + AI run in WASM.
-import init, { GameSim } from './pkg/rocket_wasm.js';
+// RKT.BTL frontend: rendering + input only. Physics, AI, and game logic run in WASM.
+// One menu picks between Solo (single-rocket sandbox, Sim) and Vs AI (GameSim).
+import init, { Sim, GameSim } from './pkg/rocket_wasm.js';
 
 const DT = 1 / 60;
 const COL = { player: '#5ec8ff', opp: '#ff5e3a', good: '#3ddc97', dim: '#8aa0b8', gold: '#f2c14e' };
 
 await init();
-const game = new GameSim();
 
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
 const W = cv.width, H = cv.height;
-let snap = game.snapshot();
-const SCALE = W / snap.world_w;
-const FUEL_MAX = (snap.rockets[0] && snap.rockets[0].fuel) || 100;
+const $ = id => document.getElementById(id);
+
+let mode = null;     // 'solo' | 'vs'
+let engine = null;   // Sim (solo) or GameSim (vs)
+let snap = null;
+let SCALE = 1;
+let FUEL_MAX = 100;
+let running = false;
+const legAnim = [0, 0];
+
 const toPx = (x, y) => [x * SCALE, H - y * SCALE];
 function b2w(r, bx, by) {
   const s = Math.sin(r.th), c = Math.cos(r.th);
   return [r.x + bx * c - by * s, r.y + bx * s + by * c];
 }
 
+// ---- input ----
 const keys = { left: false, right: false };
 addEventListener('keydown', e => {
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = true;
@@ -30,30 +38,110 @@ addEventListener('keyup', e => {
   if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') keys.left = false;
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
 });
-document.getElementById('reset').onclick = rematch;
 
-// "Display AI controls" toggle: show the AI rocket's engine flames (in 2D) and its L/R thrust bars.
-const showAIEl = document.getElementById('showAI');
-const bThrustBlock = document.getElementById('bThrustBlock');
+// ---- "Display AI controls" toggle (vs only) ----
+const showAIEl = $('showAI');
+const bThrustBlock = $('bThrustBlock');
 const showAI = () => showAIEl.checked;
 showAIEl.addEventListener('change', () => { bThrustBlock.style.display = showAIEl.checked ? '' : 'none'; });
-function rematch() { game.reset(); document.getElementById('banner').classList.remove('show'); applyParams(); }
 
-// collision tuning (persists across rematches)
-const restEl = document.getElementById('rest'), crushEl = document.getElementById('crush');
-function applyParams() {
-  game.set_param('rocket_restitution', parseFloat(restEl.value));
-  game.set_param('rocket_crush_speed', parseFloat(crushEl.value));
+// ---- vs collision sliders ----
+const restEl = $('rest'), crushEl = $('crush');
+restEl.oninput = () => { $('restVal').textContent = parseFloat(restEl.value).toFixed(2); applyParams(); };
+crushEl.oninput = () => { $('crushVal').textContent = parseFloat(crushEl.value).toFixed(1); applyParams(); };
+
+// ---- solo tuning sliders ----
+function bindSolo(id, labId, param, fmt) {
+  const el = $(id), lab = $(labId);
+  el.oninput = () => {
+    const v = parseFloat(el.value);
+    if (mode === 'solo' && engine) engine.set_param(param, v);
+    lab.textContent = fmt(v);
+    updateRatios();
+  };
 }
-restEl.oninput = () => { document.getElementById('restVal').textContent = parseFloat(restEl.value).toFixed(2); applyParams(); };
-crushEl.oninput = () => { document.getElementById('crushVal').textContent = parseFloat(crushEl.value).toFixed(1); applyParams(); };
-applyParams();
+bindSolo('sm', 'lm', 'm', v => v.toFixed(2));
+bindSolo('st', 'lt', 'tmax', v => v.toFixed(0));
+bindSolo('sd', 'ld', 'd', v => v.toFixed(2));
+bindSolo('si', 'li', 'i_scale', v => v.toFixed(2));
+bindSolo('sk', 'lk', 'leg_k', v => v.toFixed(0));
+bindSolo('sc', 'lc', 'leg_c', v => v.toFixed(0));
+bindSolo('smu', 'lmu', 'leg_mu', v => v.toFixed(2));
+$('sif').oninput = e => {
+  const on = e.target.value === '1';
+  if (mode === 'solo' && engine) engine.set_param('infinite_fuel', on ? 1 : 0);
+  $('lif').textContent = on ? 'ON' : 'off';
+};
 
-const legAnim = [0, 0];
+// push the current UI values into a freshly created engine
+function applyParams() {
+  if (!engine) return;
+  if (mode === 'vs') {
+    engine.set_param('rocket_restitution', parseFloat(restEl.value));
+    engine.set_param('rocket_crush_speed', parseFloat(crushEl.value));
+  } else if (mode === 'solo') {
+    engine.set_param('m', parseFloat($('sm').value));
+    engine.set_param('tmax', parseFloat($('st').value));
+    engine.set_param('d', parseFloat($('sd').value));
+    engine.set_param('i_scale', parseFloat($('si').value));
+    engine.set_param('leg_k', parseFloat($('sk').value));
+    engine.set_param('leg_c', parseFloat($('sc').value));
+    engine.set_param('leg_mu', parseFloat($('smu').value));
+    engine.set_param('infinite_fuel', $('sif').value === '1' ? 1 : 0);
+  }
+}
+
+function updateRatios() {
+  if (mode !== 'solo' || !engine) return;
+  const r = engine.ratios();
+  $('rtw').textContent = r.thrust_to_weight.toFixed(2);
+  $('raa').textContent = r.angular_authority.toFixed(1) + ' rad/s²';
+}
+
+function rematch() {
+  if (!engine) return;
+  engine.reset();
+  $('banner').classList.remove('show');
+  applyParams();
+}
+$('reset').onclick = rematch;
+
+// ---- menu / mode switching ----
+function startMode(m) {
+  if (engine && engine.free) engine.free();
+  mode = m;
+  engine = m === 'solo' ? new Sim() : new GameSim();
+  snap = engine.snapshot();
+  SCALE = W / snap.world_w;
+  FUEL_MAX = (snap.rockets[0] && snap.rockets[0].fuel) || 100;
+  legAnim[0] = legAnim[1] = 0;
+  $('menu').style.display = 'none';
+  $('game').style.display = '';
+  $('vsPanel').style.display = m === 'vs' ? '' : 'none';
+  $('soloPanel').style.display = m === 'solo' ? '' : 'none';
+  $('reset').textContent = m === 'solo' ? 'RESET ⟳' : 'REMATCH ⟳';
+  $('banner').classList.remove('show');
+  applyParams();
+  updateRatios();
+  if (!running) { running = true; last = performance.now(); requestAnimationFrame(loop); }
+}
+$('modeSolo').onclick = () => startMode('solo');
+$('modeVs').onclick = () => startMode('vs');
+$('backMenu').onclick = () => {
+  $('game').style.display = 'none';
+  $('menu').style.display = '';
+  if (engine && engine.free) engine.free();
+  mode = null; engine = null; snap = null;
+};
+
+// ---- rendering ----
+function throttleFor(r) {
+  if (mode === 'solo') return engine.throttle();
+  return r.side === 0 ? engine.player_throttle() : engine.opp_throttle();
+}
 
 function drawRocket(r, i) {
   const dead = r.status === 'dead', landed = r.status === 'landed';
-  // indestructible TOP half is gold; destructible bottom half keeps the side colour.
   const topCol = dead ? COL.opp : landed ? COL.good : COL.gold;
   const botCol = dead ? COL.opp : landed ? COL.good : (r.side === 0 ? COL.player : COL.opp);
   const target = r.legs_out ? 1 : 0;
@@ -72,17 +160,17 @@ function drawRocket(r, i) {
   ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(0, -h / 2 - w * 0.7); ctx.lineTo(w / 2, -h / 2);
   ctx.closePath(); ctx.fill();
 
-  // flames: player always; AI only when "Display AI controls" is on.
-  if (r.side === 0 || showAI()) {
-    const thr = r.side === 0 ? game.player_throttle() : game.opp_throttle();
-    const dpx = 0.28 * SCALE;
+  // flames: player/solo always; AI only when "Display AI controls" is on.
+  if (mode === 'solo' || r.side === 0 || showAI()) {
+    const thr = throttleFor(r);
+    const dpx = (mode === 'solo' ? engine.get_param('d') : 0.28) * SCALE;
     ctx.fillStyle = '#ffb13a';
     if (thr[0] > 0.02) flame(-dpx, h / 2, thr[0]);
     if (thr[1] > 0.02) flame(dpx, h / 2, thr[1]);
   }
   ctx.restore();
 
-  // fuel bar floating above the rocket (horizontal in screen space, green -> orange -> red as it drains)
+  // fuel bar floating above the rocket (green -> orange -> red as it drains)
   if (!dead) {
     const f = Math.max(0, Math.min(1, r.fuel / FUEL_MAX));
     const bw = w * 1.4, bh = 5;
@@ -128,7 +216,6 @@ function drawPad(p) {
   const [, padBottom] = toPx(0, p.y);
   ctx.beginPath(); ctx.moveTo(l1, padBottom); ctx.lineTo(l1, H); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(l2, padBottom); ctx.lineTo(l2, H); ctx.stroke();
-  // deploy ring
   const [dcx, dcy] = toPx(p.cx, p.y);
   ctx.strokeStyle = p.owner === 0 ? 'rgba(94,200,255,.18)' : 'rgba(255,94,58,.18)';
   ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.arc(dcx, dcy, snap.deploy_r * SCALE, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
@@ -143,21 +230,20 @@ function render() {
   snap.rockets.forEach((r, i) => drawRocket(r, i));
 }
 
-function setBar(id, frac, max = 100) { document.getElementById(id).style.width = Math.min(100, frac / max * 100) + '%'; }
-function updateHUD() {
+function setBar(id, frac, max = 100) { $(id).style.width = Math.min(100, frac / max * 100) + '%'; }
+
+function updateVsHUD() {
   const a = snap.rockets[0], b = snap.rockets[1];
-  const $ = id => document.getElementById(id);
   $('aStatus').textContent = a.status; $('bStatus').textContent = b.status;
   $('aFuel').textContent = a.fuel.toFixed(0); $('bFuel').textContent = b.fuel.toFixed(0);
   $('aStable').textContent = a.stable_time.toFixed(2) + ' s'; $('bStable').textContent = b.stable_time.toFixed(2) + ' s';
   setBar('aStb', a.stable_time, 1); setBar('bStb', b.stable_time, 1);
-  const thr = game.player_throttle();
+  const thr = engine.player_throttle();
   setBar('aTl', thr[0] * 100); setBar('aTr', thr[1] * 100);
   if (showAI()) {
-    const othr = game.opp_throttle();
+    const othr = engine.opp_throttle();
     setBar('bTl', othr[0] * 100); setBar('bTr', othr[1] * 100);
   }
-
   if (snap.outcome !== 'playing' && snap.outcome !== '') {
     const banner = $('banner'), text = $('bannerText');
     const map = { a_wins: ['YOU WIN', COL.player], b_wins: ['AI WINS', COL.opp], draw: ['DRAW', COL.dim] };
@@ -167,22 +253,39 @@ function updateHUD() {
   }
 }
 
+function updateSoloHUD() {
+  const r = snap.rockets[0];
+  $('px').textContent = r.x.toFixed(2);
+  $('py').textContent = r.y.toFixed(2);
+  $('vel').textContent = Math.hypot(r.vx, r.vy).toFixed(2);
+  $('ang').textContent = (r.th * 180 / Math.PI).toFixed(1) + '°';
+  $('om').textContent = r.om.toFixed(2);
+  $('fu').textContent = r.fuel.toFixed(0);
+  const thr = engine.throttle();
+  setBar('tlb', thr[0] * 100); setBar('trb', thr[1] * 100);
+  $('lg').textContent = r.legs_out ? 'DEPLOYED' : 'stowed';
+  $('stv').textContent = r.stable_time.toFixed(2) + ' s';
+  setBar('stb', r.stable_time, 1);
+  const st = $('status'); st.className = 'status ' + r.status; st.textContent = r.status.toUpperCase();
+}
+
+// ---- fixed-timestep loop ----
 let last = performance.now(), acc = 0;
 function tick(n) {
-  game.set_input(keys.left, keys.right);
-  for (let i = 0; i < n; i++) game.step();
-  snap = game.snapshot();
-  render(); updateHUD();
+  engine.set_input(keys.left, keys.right);
+  for (let i = 0; i < n; i++) engine.step();
+  snap = engine.snapshot();
+  render();
+  if (mode === 'solo') updateSoloHUD(); else updateVsHUD();
 }
 function loop(now) {
   let frame = (now - last) / 1000; last = now;
   if (frame > 0.1) frame = 0.1;
   acc += frame;
   let steps = 0; while (acc >= DT) { acc -= DT; steps++; }
-  tick(steps);
+  if (engine && mode) tick(steps); else acc = 0;
   requestAnimationFrame(loop);
 }
-requestAnimationFrame(loop);
 
 // debug hook for headless tooling (rAF is throttled when the tab is hidden)
-window.__rkt = { game, tick, press: (l, r) => { keys.left = l; keys.right = r; } };
+window.__rkt = { start: startMode, tick, press: (l, r) => { keys.left = l; keys.right = r; } };
