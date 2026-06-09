@@ -510,6 +510,13 @@ fn resolve_rocket_collisions(cfg: &Cfg, rockets: &mut [Rocket]) {
             // --- geometry & kinematics from immutable borrows ---
             let (ai0, ai1) = (rockets[i].hull_bottom(cfg), rockets[i].hull_top(cfg));
             let (bj0, bj1) = (rockets[j].hull_bottom(cfg), rockets[j].hull_top(cfg));
+            // cheap bounding-circle reject: each capsule fits in a circle at its
+            // segment midpoint with radius (half-length + hull radius). If those
+            // circles can't reach each other, skip the exact segment solve.
+            let reach = ai1.sub(ai0).len() * 0.5 + bj1.sub(bj0).len() * 0.5 + contact;
+            if ai0.add(ai1).scale(0.5).sub(bj0.add(bj1).scale(0.5)).len_sq() > reach * reach {
+                continue;
+            }
             let (d_sq, cp_i) = seg_seg_closest(ai0, ai1, bj0, bj1);
             if d_sq > contact_sq {
                 continue;
@@ -620,6 +627,11 @@ fn resolve_pad_collisions(cfg: &Cfg, rockets: &mut [Rocket], pads: &[Pad]) {
             let pb = Vec2::new(p.cx + half, cy);
 
             let (h0, h1) = (r.hull_bottom(cfg), r.hull_top(cfg));
+            // cheap bounding-circle reject before the exact segment solve.
+            let reach = h1.sub(h0).len() * 0.5 + half + sep; // pad half-length is `half`
+            if h0.add(h1).scale(0.5).sub(pa.add(pb).scale(0.5)).len_sq() > reach * reach {
+                continue;
+            }
             let (d_sq, cp_h) = seg_seg_closest(h0, h1, pa, pb);
             if d_sq > sep * sep {
                 continue;
