@@ -5,7 +5,7 @@ import init, { Sim, GameSim } from './pkg/rocket_wasm.js';
 const DT = 1 / 60;
 const COL = { player: '#5ec8ff', opp: '#ff5e3a', good: '#3ddc97', dim: '#8aa0b8', gold: '#f2c14e' };
 
-await init(new URL('./pkg/rocket_wasm_bg.wasm?v=7', import.meta.url));
+await init(new URL('./pkg/rocket_wasm_bg.wasm?v=8', import.meta.url));
 
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');

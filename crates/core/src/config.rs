@@ -65,7 +65,7 @@ impl Default for Cfg {
             tmax: 31.0,
             i_scale: 3.3,
 
-            fuel_max: 100.0,
+            fuel_max: 130.0,
             fuel_rate: 8.0,
             infinite_fuel: false,
 
@@ -78,7 +78,7 @@ impl Default for Cfg {
             leg_splay: 0.6,
             leg_k: 400.0,
             leg_c: 30.0,
-            leg_mu: 0.40,
+            leg_mu: 0.22,
 
             hull_r: 0.30,
             rocket_restitution: 0.35,

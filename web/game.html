@@ -103,7 +103,7 @@
         <div class="card player">
           <div class="row"><span class="k">YOU (land right pad)</span></div>
           <div class="row"><span class="k">status</span><span class="v" id="aStatus">flying</span></div>
-          <div class="row"><span class="k">fuel</span><span class="v" id="aFuel">100</span></div>
+          <div class="row"><span class="k">fuel</span><span class="v" id="aFuel">130</span></div>
           <div class="row"><span class="k">stable</span><span class="v" id="aStable">0.00 s</span></div>
           <div class="bar"><i id="aStb" style="background:var(--player)"></i></div>
           <div class="row" style="margin-top:6px"><span class="k">L / R thrust</span></div>
@@ -113,7 +113,7 @@
         <div class="card opp">
           <div class="row"><span class="k">AI (lands your pad)</span></div>
           <div class="row"><span class="k">status</span><span class="v" id="bStatus" style="color:var(--accent)">flying</span></div>
-          <div class="row"><span class="k">fuel</span><span class="v" id="bFuel" style="color:var(--accent)">100</span></div>
+          <div class="row"><span class="k">fuel</span><span class="v" id="bFuel" style="color:var(--accent)">130</span></div>
           <div class="row"><span class="k">stable</span><span class="v" id="bStable" style="color:var(--accent)">0.00 s</span></div>
           <div class="bar"><i id="bStb" style="background:var(--accent)"></i></div>
           <div id="bThrustBlock" style="display:none">
@@ -134,7 +134,7 @@
         <div class="slider"><label>inertia scale <b><span id="li">3.30</span>×</b></label><input type="range" id="si" min="0.2" max="4" step="0.05" value="3.3"></div>
         <div class="slider"><label>leg stiffness k <b><span id="lk">400</span></b></label><input type="range" id="sk" min="200" max="2500" step="50" value="400"></div>
         <div class="slider"><label>leg damping c <b><span id="lc">30</span></b></label><input type="range" id="sc" min="5" max="200" step="5" value="30"></div>
-        <div class="slider"><label>friction μ <b><span id="lmu">0.40</span></b></label><input type="range" id="smu" min="0.1" max="2.5" step="0.05" value="0.4"></div>
+        <div class="slider"><label>friction μ <b><span id="lmu">0.22</span></b></label><input type="range" id="smu" min="0.1" max="2.5" step="0.01" value="0.22"></div>
         <div class="slider"><label>infinite fuel <b><span id="lif">off</span></b></label><input type="range" id="sif" min="0" max="1" step="1" value="0"></div>
         <div id="collisionTune">
           <div class="slider"><label>bounce (restitution) <b><span id="restVal">0.35</span></b></label><input type="range" id="rest" min="0" max="1" step="0.05" value="0.35"></div>
@@ -153,7 +153,7 @@
         <div class="row"><span class="k">vel</span><span class="v" id="vel">0</span></div>
         <div class="row"><span class="k">angle</span><span class="v" id="ang">0</span></div>
         <div class="row"><span class="k">ang vel</span><span class="v" id="om">0</span></div>
-        <div class="row"><span class="k">fuel</span><span class="v" id="fu">100</span></div>
+        <div class="row"><span class="k">fuel</span><span class="v" id="fu">130</span></div>
         <div class="row" style="margin-top:8px"><span class="k">L / R thrust</span></div>
         <div class="bar"><i id="tlb" style="background:var(--warn)"></i></div>
         <div class="bar" style="margin-top:3px"><i id="trb" style="background:var(--warn)"></i></div>
@@ -181,6 +181,6 @@
       throw new Error('opened via file://, serve over http instead');
     }
   </script>
-  <script type="module" src="./game.js?v=8"></script>
+  <script type="module" src="./game.js?v=9"></script>
 </body>
 </html>
