@@ -52,8 +52,8 @@ showTuneEl.addEventListener('change', () => { tunePanel.style.display = showTune
 
 // ---- collision sliders (vs only) ----
 const restEl = $('rest'), crushEl = $('crush');
-restEl.oninput = () => { $('restVal').textContent = parseFloat(restEl.value).toFixed(2); applyParams(); };
-crushEl.oninput = () => { $('crushVal').textContent = parseFloat(crushEl.value).toFixed(1); applyParams(); };
+restEl.oninput = () => { const v = parseFloat(restEl.value); $('restVal').textContent = v.toFixed(2); if (engine) engine.set_param('rocket_restitution', v); };
+crushEl.oninput = () => { const v = parseFloat(crushEl.value); $('crushVal').textContent = v.toFixed(1); if (engine) engine.set_param('rocket_crush_speed', v); };
 
 // ---- body / leg tuning sliders (shared by solo and vs; set_param works on both engines) ----
 function bindParam(id, labId, param, fmt) {
@@ -78,21 +78,33 @@ $('sif').oninput = e => {
   $('lif').textContent = on ? 'ON' : 'off';
 };
 
-// push the current UI values into a freshly created engine
-function applyParams() {
+// Pull the engine's current parameters (the Rust Cfg::default, plus any live
+// tweaks) into the sliders. config.rs is the single source of truth for the
+// defaults; the UI just reflects whatever the engine reports.
+function syncSlidersFromEngine() {
   if (!engine) return;
-  engine.set_param('m', parseFloat($('sm').value));
-  engine.set_param('tmax', parseFloat($('st').value));
-  engine.set_param('d', parseFloat($('sd').value));
-  engine.set_param('i_scale', parseFloat($('si').value));
-  engine.set_param('leg_k', parseFloat($('sk').value));
-  engine.set_param('leg_c', parseFloat($('sc').value));
-  engine.set_param('leg_mu', parseFloat($('smu').value));
-  engine.set_param('infinite_fuel', $('sif').value === '1' ? 1 : 0);
+  const sync = (id, labId, param, fmt) => {
+    const v = engine.get_param(param);
+    $(id).value = v;
+    $(labId).textContent = fmt(v);
+  };
+  sync('sm', 'lm', 'm', v => v.toFixed(2));
+  sync('st', 'lt', 'tmax', v => v.toFixed(0));
+  sync('sd', 'ld', 'd', v => v.toFixed(2));
+  sync('si', 'li', 'i_scale', v => v.toFixed(2));
+  sync('sk', 'lk', 'leg_k', v => v.toFixed(0));
+  sync('sc', 'lc', 'leg_c', v => v.toFixed(0));
+  sync('smu', 'lmu', 'leg_mu', v => v.toFixed(2));
+  const inf = engine.get_param('infinite_fuel') !== 0;
+  $('sif').value = inf ? '1' : '0';
+  $('lif').textContent = inf ? 'ON' : 'off';
   if (mode === 'vs') {
-    engine.set_param('rocket_restitution', parseFloat(restEl.value));
-    engine.set_param('rocket_crush_speed', parseFloat(crushEl.value));
+    const e = engine.get_param('rocket_restitution');
+    $('rest').value = e; $('restVal').textContent = e.toFixed(2);
+    const cr = engine.get_param('rocket_crush_speed');
+    $('crush').value = cr; $('crushVal').textContent = cr.toFixed(1);
   }
+  updateRatios();
 }
 
 function updateRatios() {
@@ -104,9 +116,8 @@ function updateRatios() {
 
 function rematch() {
   if (!engine) return;
-  engine.reset();
+  engine.reset(); // keeps the current cfg, so slider tweaks persist across a reset
   $('banner').classList.remove('show');
-  applyParams();
 }
 $('reset').onclick = rematch;
 
@@ -130,8 +141,7 @@ function startMode(m) {
   bThrustBlock.style.display = 'none';
   $('reset').textContent = m === 'solo' ? 'RESET ⟳' : 'REMATCH ⟳';
   $('banner').classList.remove('show');
-  applyParams();
-  updateRatios();
+  syncSlidersFromEngine();
   if (!running) { running = true; last = performance.now(); requestAnimationFrame(loop); }
 }
 $('modeSolo').onclick = () => startMode('solo');
