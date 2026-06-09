@@ -65,8 +65,8 @@ impl Default for Cfg {
             tmax: 31.0,
             i_scale: 3.3,
 
-            fuel_max: 130.0,
-            fuel_rate: 8.0,
+            fuel_max: 100.0,
+            fuel_rate: 6.15,
             infinite_fuel: false,
 
             world_w: 32.0,
