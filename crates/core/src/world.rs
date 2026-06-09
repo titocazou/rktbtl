@@ -270,8 +270,28 @@ pub fn step_isolated(cfg: &Cfg, pad: &Pad, r: &mut Rocket, action: Action) {
 /// Integrate a single rocket one step against the static environment (its target
 /// pad + world bounds). Rocket–rocket contact is handled separately.
 fn integrate(cfg: &Cfg, pads: &[Pad], r: &mut Rocket, action: Action) {
-    if r.status != Status::Flying {
-        return;
+    match r.status {
+        // A landed rocket has settled on a pad; leave it put.
+        Status::Landed => return,
+        // A wreck keeps tumbling under gravity instead of freezing: no thrust,
+        // no legs, no control, just the linear and angular momentum it died with.
+        // It grinds to rest once it reaches the ground.
+        Status::Dead => {
+            r.vy += cfg.g * cfg.dt;
+            r.x += r.vx * cfg.dt;
+            r.y += r.vy * cfg.dt;
+            r.th += r.om * cfg.dt;
+            let floor = cfg.hull_r;
+            if r.y <= floor {
+                r.y = floor;
+                r.vy = 0.0;
+                r.vx *= 0.7; // skid to rest
+                r.om *= 0.6; // tumble winds down
+            }
+            r.x = r.x.clamp(cfg.hull_r, cfg.world_w - cfg.hull_r);
+            return;
+        }
+        Status::Flying => {}
     }
 
     let mut tl = action.tl.clamp(0.0, 1.0);
