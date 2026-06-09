@@ -1,0 +1,15 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/core",
+    "crates/py",
+    "crates/wasm",
+]
+
+# Release profile tuned for the simulation hot loop (RL throughput + WASM size).
+# NB: no `panic = "abort"` — the PyO3 extension relies on unwinding to turn a
+# Rust panic into a Python exception rather than killing the interpreter.
+[profile.release]
+opt-level = 3
+lto = "fat"
+codegen-units = 1

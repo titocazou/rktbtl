@@ -1,0 +1,20 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "rocket-lander"
+version = "0.1.0"
+description = "Deterministic 2D rocket-lander sim (Rust core) with Gymnasium RL envs."
+requires-python = ">=3.8"
+dependencies = ["numpy>=1.20"]
+
+[project.optional-dependencies]
+gym = ["gymnasium>=0.29"]
+
+[tool.maturin]
+# Mixed Rust/Python: compiled module is rocket_lander._core, pure-Python
+# package source lives under python/.
+python-source = "python"
+module-name = "rocket_lander._core"
+features = ["pyo3/extension-module"]

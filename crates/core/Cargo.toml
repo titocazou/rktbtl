@@ -1,0 +1,24 @@
+[package]
+name = "rocket-core"
+version = "0.1.0"
+edition = "2021"
+description = "Pure, deterministic 2D rocket-lander physics + game core (no rendering, no I/O)."
+
+[lib]
+# pure library: no DOM, no Python, no allocation in the hot path.
+crate-type = ["rlib"]
+
+[dependencies]
+
+[features]
+default = []
+# Optional serde derives on the public state/config types (used by the WASM and
+# debug tooling, kept off the RL hot path by default).
+serde = ["dep:serde"]
+
+[dependencies.serde]
+version = "1"
+features = ["derive"]
+optional = true
+
+[dev-dependencies]

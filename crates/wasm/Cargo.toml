@@ -1,0 +1,21 @@
+[package]
+name = "rocket-wasm"
+version = "0.1.0"
+edition = "2021"
+description = "wasm-bindgen browser frontend for rocket-core."
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+rocket-core = { path = "../core" }
+wasm-bindgen = "=0.2.122"
+serde = { version = "1", features = ["derive"] }
+serde-wasm-bindgen = "0.6"
+
+[dependencies.console_error_panic_hook]
+version = "0.1"
+optional = true
+
+[features]
+default = ["console_error_panic_hook"]

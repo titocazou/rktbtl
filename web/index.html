@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>RKTLNDR — rust core</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Major+Mono+Display&family=Space+Mono:wght@400;700&display=swap');
+  :root{--bg:#0a0e14;--panel:#11161f;--ink:#c9d6e3;--dim:#5a6b80;--accent:#ff5e3a;--good:#3ddc97;--grid:#1a222e;--warn:#ffb13a;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--ink);font-family:'Space Mono',monospace;min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:24px 16px;
+       background-image:radial-gradient(circle at 20% 10%,rgba(255,94,58,.04),transparent 40%),radial-gradient(circle at 80% 90%,rgba(61,220,151,.04),transparent 40%);}
+  h1{font-family:'Major Mono Display',monospace;font-size:1.6rem;letter-spacing:.15em;font-weight:400;margin-bottom:4px;}
+  .sub{color:var(--dim);font-size:.72rem;letter-spacing:.05em;margin-bottom:18px;}
+  .wrap{display:flex;gap:18px;align-items:flex-start;flex-wrap:wrap;justify-content:center;}
+  .stage{border:1px solid var(--grid);background:#060910;position:relative;box-shadow:0 0 0 1px #000,0 20px 60px rgba(0,0,0,.5);}
+  canvas{display:block;}
+  .hud,.tune{width:230px;background:var(--panel);border:1px solid var(--grid);padding:16px;font-size:.74rem;}
+  h2{font-size:.62rem;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;margin-bottom:10px;font-weight:700;}
+  .row{display:flex;justify-content:space-between;padding:3px 0;}
+  .row .k{color:var(--dim);}
+  .status{margin:14px 0;padding:8px;text-align:center;letter-spacing:.1em;border:1px solid var(--grid);}
+  .status.flying{color:var(--ink);}
+  .status.landed{color:var(--good);border-color:var(--good);}
+  .status.dead{color:var(--accent);border-color:var(--accent);}
+  .keys{margin-top:14px;color:var(--dim);font-size:.66rem;line-height:1.7;}
+  .keys b{color:var(--ink);}
+  .bar{height:5px;background:var(--grid);margin-top:3px;position:relative;}
+  .bar>i{position:absolute;left:0;top:0;bottom:0;background:var(--accent);display:block;}
+  button{width:100%;margin-top:14px;background:transparent;color:var(--ink);border:1px solid var(--dim);padding:8px;font-family:inherit;font-size:.7rem;letter-spacing:.15em;cursor:pointer;transition:all .15s;}
+  button:hover{border-color:var(--accent);color:var(--accent);}
+  .slider{margin-bottom:14px;}
+  .slider label{display:flex;justify-content:space-between;color:var(--dim);margin-bottom:4px;}
+  .slider label b{color:var(--ink);font-weight:400;}
+  .slider input[type=range]{width:100%;-webkit-appearance:none;appearance:none;height:3px;background:var(--grid);outline:none;}
+  .slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;appearance:none;width:12px;height:12px;background:var(--accent);cursor:pointer;}
+  .ratios{margin-top:14px;padding-top:12px;border-top:1px solid var(--grid);}
+  .ratios .row .v{color:var(--warn);font-weight:700;}
+  #tunePanel{display:none;}
+  #tunePanel.open{display:block;}
+  .toggle{cursor:pointer;color:var(--dim);}
+  .toggle:hover{color:var(--accent);}
+</style>
+</head>
+<body>
+  <h1>rktlndr</h1>
+  <div class="sub">2D rocket dynamics · rust core (wasm) · arrow keys = on/off thrust · <a href="./game.html" style="color:#5ec8ff">versus mode →</a></div>
+  <div class="wrap">
+    <div class="tune">
+      <h2 class="toggle" id="tuneToggle">▸ Tuning (defaults locked)</h2>
+      <div id="tunePanel">
+        <div class="slider"><label>mass <b><span id="lm">1.80</span> kg</b></label><input type="range" id="sm" min="0.3" max="4" step="0.05" value="1.8"></div>
+        <div class="slider"><label>thrust / booster <b><span id="lt">22</span> N</b></label><input type="range" id="st" min="5" max="60" step="1" value="22"></div>
+        <div class="slider"><label>booster offset d <b><span id="ld">0.28</span> m</b></label><input type="range" id="sd" min="0.05" max="0.6" step="0.01" value="0.28"></div>
+        <div class="slider"><label>inertia scale <b><span id="li">3.30</span>×</b></label><input type="range" id="si" min="0.2" max="4" step="0.05" value="3.3"></div>
+        <div class="slider"><label>leg stiffness k <b><span id="lk">400</span></b></label><input type="range" id="sk" min="200" max="2500" step="50" value="400"></div>
+        <div class="slider"><label>leg damping c <b><span id="lc">30</span></b></label><input type="range" id="sc" min="5" max="200" step="5" value="30"></div>
+        <div class="slider"><label>friction μ <b><span id="lmu">0.40</span></b></label><input type="range" id="smu" min="0.1" max="2.5" step="0.05" value="0.4"></div>
+        <div class="slider"><label>infinite fuel <b><span id="lif">off</span></b></label><input type="range" id="sif" min="0" max="1" step="1" value="0"></div>
+      </div>
+      <div class="ratios">
+        <div class="row"><span class="k">thrust / weight</span><span class="v" id="rtw">—</span></div>
+        <div class="row" style="margin-top:8px"><span class="k">ang. authority</span><span class="v" id="raa">—</span></div>
+      </div>
+    </div>
+
+    <div class="stage"><canvas id="cv" width="640" height="560"></canvas></div>
+
+    <div class="hud">
+      <h2>Telemetry</h2>
+      <div class="row"><span class="k">pos x</span><span class="v" id="px">0</span></div>
+      <div class="row"><span class="k">pos y</span><span class="v" id="py">0</span></div>
+      <div class="row"><span class="k">vel</span><span class="v" id="vel">0</span></div>
+      <div class="row"><span class="k">angle</span><span class="v" id="ang">0</span></div>
+      <div class="row"><span class="k">ang vel</span><span class="v" id="om">0</span></div>
+      <div class="row"><span class="k">fuel</span><span class="v" id="fu">100</span></div>
+      <h2 style="margin-top:16px">Thrust</h2>
+      <div class="row"><span class="k">left</span><span class="v" id="tlv">0%</span></div><div class="bar"><i id="tlb"></i></div>
+      <div class="row" style="margin-top:6px"><span class="k">right</span><span class="v" id="trv">0%</span></div><div class="bar"><i id="trb"></i></div>
+      <div class="row" style="margin-top:8px"><span class="k">legs</span><span class="v" id="lg">stowed</span></div>
+      <div class="row" style="margin-top:4px"><span class="k">stable</span><span class="v" id="stv">0.00 s</span></div><div class="bar"><i id="stb" style="background:var(--good)"></i></div>
+      <div class="status flying" id="status">FLYING</div>
+      <div class="keys"><b>← →</b> left / right booster<br><b>both</b> pure thrust, no torque<br><b>R</b> reset</div>
+      <button id="reset">RESET ⟳</button>
+    </div>
+  </div>
+  <script>
+    // WASM + ES modules can't load from file://. If opened by double-clicking,
+    // show how to serve it instead of a silent black canvas.
+    if (location.protocol === 'file:') {
+      document.body.innerHTML =
+        '<div style="max-width:640px;margin:12vh auto;color:#c9d6e3;font-family:monospace;line-height:1.8">' +
+        '<h2 style="color:#ff5e3a">serve this over http — don’t open the file directly</h2>' +
+        '<p>The Rust/WASM core can’t load from a <code>file://</code> URL. From the project root run:</p>' +
+        '<pre style="background:#11161f;padding:14px;border:1px solid #1a222e">python3 -m http.server 8011 --directory web</pre>' +
+        '<p>then open <a style="color:#ff5e3a" href="http://localhost:8011/index.html">http://localhost:8011/index.html</a></p></div>';
+      throw new Error('opened via file:// — serve over http instead');
+    }
+  </script>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>
