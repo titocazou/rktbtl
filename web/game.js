@@ -45,6 +45,11 @@ const bThrustBlock = $('bThrustBlock');
 const showAI = () => showAIEl.checked;
 showAIEl.addEventListener('change', () => { bThrustBlock.style.display = showAIEl.checked ? '' : 'none'; });
 
+// "Display tuning" toggle: show/hide the bounce + crush-speed sliders (vs mode).
+const showTuneEl = $('showTune');
+const tuneCard = $('tuneCard');
+showTuneEl.addEventListener('change', () => { tuneCard.style.display = showTuneEl.checked ? '' : 'none'; });
+
 // ---- vs collision sliders ----
 const restEl = $('rest'), crushEl = $('crush');
 restEl.oninput = () => { $('restVal').textContent = parseFloat(restEl.value).toFixed(2); applyParams(); };

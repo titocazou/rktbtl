@@ -98,6 +98,7 @@
       <!-- versus panel -->
       <div id="vsPanel" style="display:none">
         <label class="aitoggle"><input type="checkbox" id="showAI" style="accent-color:var(--accent);cursor:pointer;"> Display AI controls</label>
+        <label class="aitoggle"><input type="checkbox" id="showTune" style="accent-color:var(--accent);cursor:pointer;"> Display tuning</label>
         <h2 class="lbl">Match</h2>
         <div class="card player">
           <div class="row"><span class="k">YOU (land right pad)</span></div>
@@ -121,7 +122,7 @@
             <div class="bar" style="margin-top:3px"><i id="bTr" style="background:var(--accent)"></i></div>
           </div>
         </div>
-        <div class="card" id="tuneCard">
+        <div class="card" id="tuneCard" style="display:none">
           <div class="row"><span class="k">bounce (restitution)</span><span class="v" id="restVal">0.35</span></div>
           <input type="range" id="rest" min="0" max="1" step="0.05" value="0.35" style="width:100%;accent-color:#f2c14e">
           <div class="row" style="margin-top:6px"><span class="k">crush speed (m/s)</span><span class="v" id="crushVal">3.0</span></div>
