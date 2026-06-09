@@ -342,26 +342,47 @@ fn integrate(cfg: &Cfg, pads: &[Pad], r: &mut Rocket, action: Action) {
             let rel = Vec2::new(f.x - r.x, f.y - r.y);
             let vf = r.point_vel(rel);
             for (pi, p) in pads.iter().enumerate() {
-                let pen = p.top() - f.y; // penetration below the top surface
-                // thin slab: only the top face is solid (foot still above slab bottom)
-                if p.over(f.x) && pen > 0.0 && f.y >= p.y {
-                    max_foot_impact = max_foot_impact.max(vf.len());
+                if !p.over(f.x) {
+                    continue;
+                }
+                // Solid slab: a foot inside the band [pad.y, pad_top] is ejected
+                // toward the NEARER face. The top pushes up (+y), the bottom pushes
+                // down (-y), so you can neither sink through the top nor fly up
+                // through the underside.
+                let pen_top = p.top() - f.y; // depth below the top face
+                let pen_bot = f.y - p.y; // depth above the bottom face
+                if pen_top <= 0.0 || pen_bot <= 0.0 {
+                    continue; // foot is outside the slab
+                }
+                max_foot_impact = max_foot_impact.max(vf.len());
 
-                    // normal (vertical) spring + damper, clamped non-negative
-                    let mut fn_ = cfg.leg_k * pen - cfg.leg_c * vf.y;
-                    if fn_ < 0.0 {
-                        fn_ = 0.0;
-                    }
-                    // lateral friction, opposing foot x-velocity, capped at mu*Fn
-                    let cap = cfg.leg_mu * fn_;
-                    let ff = (-cfg.leg_c * 0.5 * vf.x).clamp(-cap, cap);
+                // Pick the face to eject toward. A descending foot is always
+                // caught by the top (even if it punched deep in one step);
+                // otherwise eject toward the nearer face, so a foot rising from
+                // below is pushed back down out the bottom. Spring + damper,
+                // clamped so each face only pushes out (never pulls in).
+                let on_top = vf.y < 0.0 || pen_top <= pen_bot;
+                let mut fn_ = if on_top {
+                    cfg.leg_k * pen_top - cfg.leg_c * vf.y
+                } else {
+                    cfg.leg_k * pen_bot + cfg.leg_c * vf.y
+                };
+                if fn_ < 0.0 {
+                    fn_ = 0.0;
+                }
+                let fy = if on_top { fn_ } else { -fn_ }; // signed vertical force
 
-                    c_fx += ff;
-                    c_fy += fn_;
-                    c_tau += rel.x * fn_ - rel.y * ff; // r × F (2D scalar)
-                    if pi == r.target_pad {
-                        feet_down_target += 1;
-                    }
+                // lateral friction, opposing foot x-velocity, capped at mu*|Fn|
+                let cap = cfg.leg_mu * fn_;
+                let ff = (-cfg.leg_c * 0.5 * vf.x).clamp(-cap, cap);
+
+                c_fx += ff;
+                c_fy += fy;
+                c_tau += rel.x * fy - rel.y * ff; // r × F (2D scalar)
+
+                // only resting on the TOP face counts toward a landing
+                if on_top && pi == r.target_pad {
+                    feet_down_target += 1;
                 }
             }
         }

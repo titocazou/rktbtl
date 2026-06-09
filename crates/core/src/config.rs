@@ -62,7 +62,7 @@ impl Default for Cfg {
             w: 0.6,
             h: 1.4,
             d: 0.28,
-            tmax: 22.0,
+            tmax: 31.0,
             i_scale: 3.3,
 
             fuel_max: 100.0,
