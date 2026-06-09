@@ -122,17 +122,11 @@
             <div class="bar" style="margin-top:3px"><i id="bTr" style="background:var(--accent)"></i></div>
           </div>
         </div>
-        <div class="card" id="tuneCard" style="display:none">
-          <div class="row"><span class="k">bounce (restitution)</span><span class="v" id="restVal">0.35</span></div>
-          <input type="range" id="rest" min="0" max="1" step="0.05" value="0.35" style="width:100%;accent-color:#f2c14e">
-          <div class="row" style="margin-top:6px"><span class="k">crush speed (m/s)</span><span class="v" id="crushVal">3.0</span></div>
-          <input type="range" id="crush" min="0" max="8" step="0.5" value="3" style="width:100%;accent-color:#ff5e3a">
-        </div>
         <div class="keys"><b>← →</b> or <b>A D</b> your left / right booster<br><b>both</b> = pure thrust · ram the AI's <b>engines</b> (red) hard to kill it<br>your <b>gold nose</b> is indestructible · hulls are solid · <b>R</b> rematch</div>
       </div>
 
-      <!-- solo panel -->
-      <div id="soloPanel" style="display:none">
+      <!-- shared tuning: solo shows it always; vs reveals it with "Display tuning" -->
+      <div id="tunePanel" style="display:none">
         <h2 class="lbl">Tuning</h2>
         <div class="slider"><label>mass <b><span id="lm">1.80</span> kg</b></label><input type="range" id="sm" min="0.3" max="4" step="0.05" value="1.8"></div>
         <div class="slider"><label>thrust / booster <b><span id="lt">22</span> N</b></label><input type="range" id="st" min="5" max="60" step="1" value="22"></div>
@@ -142,11 +136,19 @@
         <div class="slider"><label>leg damping c <b><span id="lc">30</span></b></label><input type="range" id="sc" min="5" max="200" step="5" value="30"></div>
         <div class="slider"><label>friction μ <b><span id="lmu">0.40</span></b></label><input type="range" id="smu" min="0.1" max="2.5" step="0.05" value="0.4"></div>
         <div class="slider"><label>infinite fuel <b><span id="lif">off</span></b></label><input type="range" id="sif" min="0" max="1" step="1" value="0"></div>
+        <div id="collisionTune">
+          <div class="slider"><label>bounce (restitution) <b><span id="restVal">0.35</span></b></label><input type="range" id="rest" min="0" max="1" step="0.05" value="0.35"></div>
+          <div class="slider"><label>crush speed (m/s) <b><span id="crushVal">3.0</span></b></label><input type="range" id="crush" min="0" max="8" step="0.5" value="3"></div>
+        </div>
         <div class="ratios">
           <div class="row"><span class="k">thrust / weight</span><span class="v" id="rtw">—</span></div>
           <div class="row" style="margin-top:8px"><span class="k">ang. authority</span><span class="v" id="raa">—</span></div>
         </div>
-        <h2 class="lbl" style="margin-top:14px">Telemetry</h2>
+      </div>
+
+      <!-- solo telemetry -->
+      <div id="telemetryPanel" style="display:none">
+        <h2 class="lbl">Telemetry</h2>
         <div class="row"><span class="k">pos x, y</span><span class="v"><span id="px">0</span>, <span id="py">0</span></span></div>
         <div class="row"><span class="k">vel</span><span class="v" id="vel">0</span></div>
         <div class="row"><span class="k">angle</span><span class="v" id="ang">0</span></div>
@@ -179,6 +181,6 @@
       throw new Error('opened via file://, serve over http instead');
     }
   </script>
-  <script type="module" src="./game.js?v=3"></script>
+  <script type="module" src="./game.js?v=4"></script>
 </body>
 </html>

@@ -314,13 +314,22 @@ impl GameSim {
         self.game.world.cfg.infinite_fuel = on;
     }
 
-    /// Tweak a collision parameter live: "rocket_restitution" (bounce, 0..1) or
-    /// "rocket_crush_speed" (m/s impact needed to destroy an engine).
+    /// Tweak a parameter live. Collision: "rocket_restitution", "rocket_crush_speed".
+    /// Body/legs (shared by both rockets): "m", "tmax", "d", "i_scale", "leg_k",
+    /// "leg_c", "leg_mu", "infinite_fuel".
     pub fn set_param(&mut self, name: &str, value: f64) {
         let c = &mut self.game.world.cfg;
         match name {
             "rocket_restitution" => c.rocket_restitution = value,
             "rocket_crush_speed" => c.rocket_crush_speed = value,
+            "m" => c.m = value,
+            "tmax" => c.tmax = value,
+            "d" => c.d = value,
+            "i_scale" => c.i_scale = value,
+            "leg_k" => c.leg_k = value,
+            "leg_c" => c.leg_c = value,
+            "leg_mu" => c.leg_mu = value,
+            "infinite_fuel" => c.infinite_fuel = value != 0.0,
             _ => {}
         }
     }
@@ -330,8 +339,21 @@ impl GameSim {
         match name {
             "rocket_restitution" => c.rocket_restitution,
             "rocket_crush_speed" => c.rocket_crush_speed,
+            "m" => c.m,
+            "tmax" => c.tmax,
+            "d" => c.d,
+            "i_scale" => c.i_scale,
+            "leg_k" => c.leg_k,
+            "leg_c" => c.leg_c,
+            "leg_mu" => c.leg_mu,
+            "infinite_fuel" => if c.infinite_fuel { 1.0 } else { 0.0 },
             _ => 0.0,
         }
+    }
+
+    /// Derived ratios for the tuning panel (same shape as `Sim::ratios`).
+    pub fn ratios(&self) -> JsValue {
+        serde_wasm_bindgen::to_value(&ratios_of(&self.game.world.cfg)).unwrap()
     }
 }
 

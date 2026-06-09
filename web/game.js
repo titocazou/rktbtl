@@ -5,7 +5,7 @@ import init, { Sim, GameSim } from './pkg/rocket_wasm.js';
 const DT = 1 / 60;
 const COL = { player: '#5ec8ff', opp: '#ff5e3a', good: '#3ddc97', dim: '#8aa0b8', gold: '#f2c14e' };
 
-await init(new URL('./pkg/rocket_wasm_bg.wasm?v=2', import.meta.url));
+await init(new URL('./pkg/rocket_wasm_bg.wasm?v=3', import.meta.url));
 
 const cv = document.getElementById('cv');
 const ctx = cv.getContext('2d');
@@ -45,59 +45,58 @@ const bThrustBlock = $('bThrustBlock');
 const showAI = () => showAIEl.checked;
 showAIEl.addEventListener('change', () => { bThrustBlock.style.display = showAIEl.checked ? '' : 'none'; });
 
-// "Display tuning" toggle: show/hide the bounce + crush-speed sliders (vs mode).
+// "Display tuning" toggle: show/hide the whole tuning panel (vs mode; solo shows it always).
 const showTuneEl = $('showTune');
-const tuneCard = $('tuneCard');
-showTuneEl.addEventListener('change', () => { tuneCard.style.display = showTuneEl.checked ? '' : 'none'; });
+const tunePanel = $('tunePanel');
+showTuneEl.addEventListener('change', () => { tunePanel.style.display = showTuneEl.checked ? '' : 'none'; });
 
-// ---- vs collision sliders ----
+// ---- collision sliders (vs only) ----
 const restEl = $('rest'), crushEl = $('crush');
 restEl.oninput = () => { $('restVal').textContent = parseFloat(restEl.value).toFixed(2); applyParams(); };
 crushEl.oninput = () => { $('crushVal').textContent = parseFloat(crushEl.value).toFixed(1); applyParams(); };
 
-// ---- solo tuning sliders ----
-function bindSolo(id, labId, param, fmt) {
+// ---- body / leg tuning sliders (shared by solo and vs; set_param works on both engines) ----
+function bindParam(id, labId, param, fmt) {
   const el = $(id), lab = $(labId);
   el.oninput = () => {
     const v = parseFloat(el.value);
-    if (mode === 'solo' && engine) engine.set_param(param, v);
+    if (engine) engine.set_param(param, v);
     lab.textContent = fmt(v);
     updateRatios();
   };
 }
-bindSolo('sm', 'lm', 'm', v => v.toFixed(2));
-bindSolo('st', 'lt', 'tmax', v => v.toFixed(0));
-bindSolo('sd', 'ld', 'd', v => v.toFixed(2));
-bindSolo('si', 'li', 'i_scale', v => v.toFixed(2));
-bindSolo('sk', 'lk', 'leg_k', v => v.toFixed(0));
-bindSolo('sc', 'lc', 'leg_c', v => v.toFixed(0));
-bindSolo('smu', 'lmu', 'leg_mu', v => v.toFixed(2));
+bindParam('sm', 'lm', 'm', v => v.toFixed(2));
+bindParam('st', 'lt', 'tmax', v => v.toFixed(0));
+bindParam('sd', 'ld', 'd', v => v.toFixed(2));
+bindParam('si', 'li', 'i_scale', v => v.toFixed(2));
+bindParam('sk', 'lk', 'leg_k', v => v.toFixed(0));
+bindParam('sc', 'lc', 'leg_c', v => v.toFixed(0));
+bindParam('smu', 'lmu', 'leg_mu', v => v.toFixed(2));
 $('sif').oninput = e => {
   const on = e.target.value === '1';
-  if (mode === 'solo' && engine) engine.set_param('infinite_fuel', on ? 1 : 0);
+  if (engine) engine.set_param('infinite_fuel', on ? 1 : 0);
   $('lif').textContent = on ? 'ON' : 'off';
 };
 
 // push the current UI values into a freshly created engine
 function applyParams() {
   if (!engine) return;
+  engine.set_param('m', parseFloat($('sm').value));
+  engine.set_param('tmax', parseFloat($('st').value));
+  engine.set_param('d', parseFloat($('sd').value));
+  engine.set_param('i_scale', parseFloat($('si').value));
+  engine.set_param('leg_k', parseFloat($('sk').value));
+  engine.set_param('leg_c', parseFloat($('sc').value));
+  engine.set_param('leg_mu', parseFloat($('smu').value));
+  engine.set_param('infinite_fuel', $('sif').value === '1' ? 1 : 0);
   if (mode === 'vs') {
     engine.set_param('rocket_restitution', parseFloat(restEl.value));
     engine.set_param('rocket_crush_speed', parseFloat(crushEl.value));
-  } else if (mode === 'solo') {
-    engine.set_param('m', parseFloat($('sm').value));
-    engine.set_param('tmax', parseFloat($('st').value));
-    engine.set_param('d', parseFloat($('sd').value));
-    engine.set_param('i_scale', parseFloat($('si').value));
-    engine.set_param('leg_k', parseFloat($('sk').value));
-    engine.set_param('leg_c', parseFloat($('sc').value));
-    engine.set_param('leg_mu', parseFloat($('smu').value));
-    engine.set_param('infinite_fuel', $('sif').value === '1' ? 1 : 0);
   }
 }
 
 function updateRatios() {
-  if (mode !== 'solo' || !engine) return;
+  if (!engine || !engine.ratios) return;
   const r = engine.ratios();
   $('rtw').textContent = r.thrust_to_weight.toFixed(2);
   $('raa').textContent = r.angular_authority.toFixed(1) + ' rad/s²';
@@ -123,7 +122,12 @@ function startMode(m) {
   $('menu').style.display = 'none';
   $('game').style.display = '';
   $('vsPanel').style.display = m === 'vs' ? '' : 'none';
-  $('soloPanel').style.display = m === 'solo' ? '' : 'none';
+  $('tunePanel').style.display = m === 'solo' ? '' : 'none'; // vs reveals it via "Display tuning"
+  $('collisionTune').style.display = m === 'vs' ? '' : 'none'; // bounce/crush only matter in vs
+  $('telemetryPanel').style.display = m === 'solo' ? '' : 'none';
+  $('showTune').checked = false;
+  $('showAI').checked = false;
+  bThrustBlock.style.display = 'none';
   $('reset').textContent = m === 'solo' ? 'RESET ⟳' : 'REMATCH ⟳';
   $('banner').classList.remove('show');
   applyParams();
