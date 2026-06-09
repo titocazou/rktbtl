@@ -47,6 +47,9 @@
       <div class="banner" id="banner"><h2 id="bannerText"></h2><small>press <b>R</b> or click rematch</small></div>
     </div>
     <div class="hud">
+      <label class="aitoggle" style="display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:.66rem;color:var(--dim);letter-spacing:.05em;margin-bottom:12px;cursor:pointer;">
+        <input type="checkbox" id="showAI" style="accent-color:var(--accent);cursor:pointer;"> Display AI controls
+      </label>
       <h2 class="lbl">Match</h2>
       <div class="card player">
         <div class="row"><span class="k">YOU (land right pad)</span></div>
@@ -64,9 +67,11 @@
         <div class="row"><span class="k">fuel</span><span class="v" id="bFuel" style="color:var(--accent)">100</span></div>
         <div class="row"><span class="k">stable</span><span class="v" id="bStable" style="color:var(--accent)">0.00 s</span></div>
         <div class="bar"><i id="bStb" style="background:var(--accent)"></i></div>
-        <div class="row" style="margin-top:6px"><span class="k">L / R thrust</span></div>
-        <div class="bar"><i id="bTl" style="background:var(--accent)"></i></div>
-        <div class="bar" style="margin-top:3px"><i id="bTr" style="background:var(--accent)"></i></div>
+        <div id="bThrustBlock" style="display:none">
+          <div class="row" style="margin-top:6px"><span class="k">L / R thrust</span></div>
+          <div class="bar"><i id="bTl" style="background:var(--accent)"></i></div>
+          <div class="bar" style="margin-top:3px"><i id="bTr" style="background:var(--accent)"></i></div>
+        </div>
       </div>
       <div class="card" id="tuneCard">
         <div class="row"><span class="k">bounce (restitution)</span><span class="v" id="restVal">0.35</span></div>

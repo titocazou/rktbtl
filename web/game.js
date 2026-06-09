@@ -31,6 +31,12 @@ addEventListener('keyup', e => {
   if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
 });
 document.getElementById('reset').onclick = rematch;
+
+// "Display AI controls" toggle: show the AI rocket's engine flames (in 2D) and its L/R thrust bars.
+const showAIEl = document.getElementById('showAI');
+const bThrustBlock = document.getElementById('bThrustBlock');
+const showAI = () => showAIEl.checked;
+showAIEl.addEventListener('change', () => { bThrustBlock.style.display = showAIEl.checked ? '' : 'none'; });
 function rematch() { game.reset(); document.getElementById('banner').classList.remove('show'); applyParams(); }
 
 // collision tuning (persists across rematches)
@@ -66,12 +72,14 @@ function drawRocket(r, i) {
   ctx.moveTo(-w / 2, -h / 2); ctx.lineTo(0, -h / 2 - w * 0.7); ctx.lineTo(w / 2, -h / 2);
   ctx.closePath(); ctx.fill();
 
-  // flames: precise per-side throttle (player from our input, AI from its last action).
-  const thr = r.side === 0 ? game.player_throttle() : game.opp_throttle();
-  const dpx = 0.28 * SCALE;
-  ctx.fillStyle = '#ffb13a';
-  if (thr[0] > 0.02) flame(-dpx, h / 2, thr[0]);
-  if (thr[1] > 0.02) flame(dpx, h / 2, thr[1]);
+  // flames: player always; AI only when "Display AI controls" is on.
+  if (r.side === 0 || showAI()) {
+    const thr = r.side === 0 ? game.player_throttle() : game.opp_throttle();
+    const dpx = 0.28 * SCALE;
+    ctx.fillStyle = '#ffb13a';
+    if (thr[0] > 0.02) flame(-dpx, h / 2, thr[0]);
+    if (thr[1] > 0.02) flame(dpx, h / 2, thr[1]);
+  }
   ctx.restore();
 
   // fuel bar floating above the rocket (horizontal in screen space, green -> orange -> red as it drains)
@@ -145,8 +153,10 @@ function updateHUD() {
   setBar('aStb', a.stable_time, 1); setBar('bStb', b.stable_time, 1);
   const thr = game.player_throttle();
   setBar('aTl', thr[0] * 100); setBar('aTr', thr[1] * 100);
-  const othr = game.opp_throttle();
-  setBar('bTl', othr[0] * 100); setBar('bTr', othr[1] * 100);
+  if (showAI()) {
+    const othr = game.opp_throttle();
+    setBar('bTl', othr[0] * 100); setBar('bTr', othr[1] * 100);
+  }
 
   if (snap.outcome !== 'playing' && snap.outcome !== '') {
     const banner = $('banner'), text = $('bannerText');
