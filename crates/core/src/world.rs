@@ -131,6 +131,13 @@ impl Rocket {
         self.status == Status::Flying
     }
 
+    /// True once the tank is empty. With `infinite_fuel` set, fuel never drops,
+    /// so this stays false.
+    #[inline]
+    pub fn out_of_fuel(&self) -> bool {
+        self.fuel <= 0.0
+    }
+
     #[inline]
     pub fn speed(&self) -> f64 {
         self.vx.hypot(self.vy)
@@ -273,8 +280,19 @@ pub fn step_isolated(cfg: &Cfg, pad: &Pad, r: &mut Rocket, action: Action) {
 /// pad + world bounds). Rocket–rocket contact is handled separately.
 fn integrate(cfg: &Cfg, pads: &[Pad], r: &mut Rocket, action: Action) {
     match r.status {
-        // A landed rocket has settled on a pad; leave it put.
-        Status::Landed => return,
+        // A landed rocket has settled on a pad; leave it put. The idle fuel drain
+        // still ticks, so parking on a pad can't stall the match clock, and a
+        // both-landed standoff (neither side neutralized) resolves once one tank
+        // runs dry.
+        Status::Landed => {
+            if !cfg.infinite_fuel {
+                r.fuel -= cfg.fuel_idle_rate * cfg.dt;
+                if r.fuel < 0.0 {
+                    r.fuel = 0.0;
+                }
+            }
+            return;
+        }
         // A wreck keeps tumbling under gravity instead of freezing: no thrust,
         // no legs, no control, just the linear and angular momentum it died with.
         // It grinds to rest once it reaches the ground.
@@ -389,9 +407,11 @@ fn integrate(cfg: &Cfg, pads: &[Pad], r: &mut Rocket, action: Action) {
     r.y += r.vy * cfg.dt;
     r.th += r.om * cfg.dt;
 
-    // fuel burn
+    // fuel burn: thrust-proportional, plus a small constant idle drain so fuel
+    // doubles as a match clock. You can't sit still forever, and there's always
+    // pressure to move and finish.
     if !cfg.infinite_fuel {
-        r.fuel -= (tl + tr) * cfg.fuel_rate * cfg.dt;
+        r.fuel -= ((tl + tr) * cfg.fuel_rate + cfg.fuel_idle_rate) * cfg.dt;
         if r.fuel < 0.0 {
             r.fuel = 0.0;
         }

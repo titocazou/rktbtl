@@ -23,8 +23,9 @@ pub struct Cfg {
 
     // --- fuel ---
     pub fuel_max: f64,
-    pub fuel_rate: f64,      // fuel/sec at full thrust, per booster
-    pub infinite_fuel: bool, // RL / sandbox toggle: never run dry
+    pub fuel_rate: f64,       // fuel/sec at full thrust, per booster
+    pub fuel_idle_rate: f64,  // fuel/sec drained constantly while flying (match clock)
+    pub infinite_fuel: bool,  // RL / sandbox toggle: never run dry
 
     // --- world bounds (m), origin bottom-left ---
     pub world_w: f64,
@@ -67,6 +68,7 @@ impl Default for Cfg {
 
             fuel_max: 100.0,
             fuel_rate: 6.15,
+            fuel_idle_rate: 1.5,
             infinite_fuel: false,
 
             world_w: 32.0,

@@ -1,11 +1,16 @@
 //! Competitive 2-rocket game on top of the same `World`.
 //!
 //! Rules (from the design):
-//!   * Two rockets, two floating pads. Each rocket *starts above its own home
-//!     pad* and wins by **landing on the opponent's pad**.
-//!   * You may destroy the opponent (ram their bottom/engine half with your
-//!     indestructible top half), but destroying them does **not** win — you can
-//!     only win by landing. If both are destroyed it's a draw.
+//!   * Two rockets, two floating pads. Each rocket starts above its own home
+//!     pad and aims to land on the opponent's pad.
+//!   * Landing alone does not win. To win you must be stably landed on the
+//!     opponent's pad AND have neutralized the opponent: destroyed them (ram
+//!     their bottom/engine half with your indestructible top half) or outlasted
+//!     them until they run out of fuel.
+//!   * Fuel drains at a small constant idle rate on top of thrust, so it doubles
+//!     as a match clock: nobody can stall forever.
+//!   * If both are destroyed it's a draw; any other terminal state is a loss for
+//!     the local player.
 //!   * The opponent is driven by a simple AI for now (a placeholder for an RL
 //!     policy): it navigates toward the player's home pad.
 
@@ -100,15 +105,21 @@ impl Game {
     }
 
     fn evaluate(&self) -> Outcome {
-        let a = self.world.rockets[0].status;
-        let b = self.world.rockets[1].status;
-        // Landing is the only win. If both land on the same step, A is the local
-        // player; treat simultaneous as A's win (deterministic tiebreak).
-        if a == Status::Landed {
+        let a = &self.world.rockets[0];
+        let b = &self.world.rockets[1];
+        // Landing alone does not win: you must be stably landed on the opponent's
+        // pad (Status::Landed is only ever set there) AND the opponent must be
+        // neutralized, i.e. destroyed or out of fuel. If both sides qualify on the
+        // same step, A is the local player and takes the deterministic tiebreak.
+        let b_neutralized = b.status == Status::Dead || b.out_of_fuel();
+        let a_neutralized = a.status == Status::Dead || a.out_of_fuel();
+        let a_wins = a.status == Status::Landed && b_neutralized;
+        let b_wins = b.status == Status::Landed && a_neutralized;
+        if a_wins {
             Outcome::AWins
-        } else if b == Status::Landed {
+        } else if b_wins {
             Outcome::BWins
-        } else if a == Status::Dead && b == Status::Dead {
+        } else if a.status == Status::Dead && b.status == Status::Dead {
             Outcome::Draw
         } else {
             Outcome::Playing

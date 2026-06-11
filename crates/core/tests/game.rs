@@ -100,7 +100,8 @@ fn player_can_win_by_landing() {
 #[test]
 fn destroying_opponent_does_not_win() {
     // If the player is destroyed, the player cannot win even if the opponent is
-    // also gone — landing is the only win. Both dead => Draw.
+    // also gone: a win still requires being landed on the opponent's pad. Both
+    // dead => Draw.
     let mut cfg = Cfg::default();
     cfg.infinite_fuel = true;
     let mut g = Game::new(cfg);
@@ -138,4 +139,57 @@ fn decided_game_is_frozen() {
     let second = g.step(Action::binary(true, true));
     assert_eq!(first, second);
     assert_eq!(g.world.steps, steps_at_decision, "no stepping after the game is decided");
+}
+
+#[test]
+fn landing_needs_opponent_neutralized() {
+    // Being stably landed on the opponent's pad is not enough on its own: while
+    // the opponent is still alive and has fuel, the game keeps playing.
+    let mut cfg = Cfg::default();
+    cfg.infinite_fuel = true; // B never runs dry
+    let mut g = Game::new(cfg);
+    g.ai_enabled = false;
+    g.world.rockets[0].status = Status::Landed; // A parked on the opponent's pad
+    g.world.rockets[1].x = 16.0; // B alive, high and clear of any contact
+    g.world.rockets[1].y = 22.0;
+    g.world.rockets[1].status = Status::Flying;
+    let outcome = g.step(Action::default());
+    assert_eq!(outcome, Outcome::Playing, "landing must not win while the opponent is alive and fueled");
+}
+
+#[test]
+fn landing_wins_once_opponent_destroyed() {
+    let mut cfg = Cfg::default();
+    cfg.infinite_fuel = true;
+    let mut g = Game::new(cfg);
+    g.ai_enabled = false;
+    g.world.rockets[0].status = Status::Landed;
+    g.world.rockets[1].status = Status::Dead;
+    assert_eq!(g.step(Action::default()), Outcome::AWins, "landed + opponent destroyed wins");
+}
+
+#[test]
+fn landing_wins_once_opponent_out_of_fuel() {
+    let mut cfg = Cfg::default();
+    cfg.infinite_fuel = false;
+    let mut g = Game::new(cfg);
+    g.ai_enabled = false;
+    g.world.rockets[0].status = Status::Landed;
+    g.world.rockets[1].x = 16.0;
+    g.world.rockets[1].y = 22.0;
+    g.world.rockets[1].status = Status::Flying;
+    g.world.rockets[1].fuel = 0.0; // opponent out of fuel
+    assert_eq!(g.step(Action::default()), Outcome::AWins, "landed + opponent out of fuel wins");
+}
+
+#[test]
+fn idle_burn_drains_fuel_without_thrust() {
+    // The constant idle drain means fuel falls even when no booster is firing.
+    let mut cfg = Cfg::default();
+    cfg.infinite_fuel = false;
+    let mut g = Game::new(cfg);
+    g.ai_enabled = false;
+    let f0 = g.world.rockets[0].fuel;
+    g.step(Action::default()); // no thrust
+    assert!(g.world.rockets[0].fuel < f0, "idle burn should drain fuel with zero thrust");
 }
