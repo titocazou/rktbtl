@@ -247,7 +247,8 @@ fn can_fly_under_floating_pad() {
 fn pad_top_is_solid_no_sinking_through() {
     // Approaching the top face from above, the slab must push back (can't sink
     // straight through it).
-    let cfg = Cfg::default();
+    let mut cfg = Cfg::default();
+    cfg.com = 0.5; // foot_drop below assumes a body centered on the CoM
     let mut w = World::single(cfg);
     let pad = w.pads[0];
     let foot_drop = cfg.h * 0.5 + cfg.leg_len * cfg.leg_splay.cos();
@@ -266,7 +267,8 @@ fn pad_top_is_solid_no_sinking_through() {
 fn ram_scene(attacker_vx: f64) -> World {
     // Attacker A is horizontal, nose pointing +x, just left of victim B's engine
     // (bottom) end, charging right at `attacker_vx`.
-    let cfg = Cfg::default();
+    let mut cfg = Cfg::default();
+    cfg.com = 0.5; // the hardcoded poses below assume a body centered on the CoM
     let pad = Pad { cx: 16.0, y: 7.0, half_w: 2.6, thick: 0.4 };
     let mut attacker = Rocket::spawn(9.0, 14.3, cfg.fuel_max, 0);
     attacker.th = -std::f64::consts::FRAC_PI_2; // nose (top) points +x toward B

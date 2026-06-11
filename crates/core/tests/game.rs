@@ -12,7 +12,7 @@ fn own_pad_supports_but_does_not_win() {
     g.ai_enabled = false; // isolate rocket A
 
     let pad0 = g.world.pads[0]; // A's own home pad
-    let foot_drop = cfg.h * 0.5 + cfg.leg_len * cfg.leg_splay.cos();
+    let foot_drop = cfg.com * cfg.h + cfg.leg_len * cfg.leg_splay.cos();
     g.world.rockets[0].x = pad0.cx;
     g.world.rockets[0].y = pad0.top() + foot_drop + 0.05; // feet just above own deck
     g.world.rockets[0].vy = -0.05;
@@ -66,9 +66,15 @@ fn ai_eventually_lands_and_wins() {
     let mut cfg = Cfg::default();
     cfg.infinite_fuel = true;
     let mut g = Game::new(cfg);
+    // Player is already a wreck off to the side, so it doesn't block B's target
+    // pad. B (AI) should fly over and win by landing on the now-clear pad.
+    g.world.rockets[0].status = Status::Dead;
+    g.world.rockets[0].x = 16.0;
+    g.world.rockets[0].y = cfg.hull_r;
+    g.world.rockets[0].vx = 0.0;
+    g.world.rockets[0].vy = 0.0;
     let mut outcome = Outcome::Playing;
     for _ in 0..3000 {
-        // player does nothing and just crashes; B (AI) should win by landing
         outcome = g.step(Action::default());
         if outcome != Outcome::Playing {
             break;
@@ -83,6 +89,13 @@ fn player_can_win_by_landing() {
     cfg.infinite_fuel = true;
     let mut g = Game::new(cfg);
     g.ai_enabled = false; // isolate: opponent coasts
+    // Opponent is already a wreck off to the side, clear of A's target pad, so
+    // the guided player can set down on it and win.
+    g.world.rockets[1].status = Status::Dead;
+    g.world.rockets[1].x = 16.0;
+    g.world.rockets[1].y = cfg.hull_r;
+    g.world.rockets[1].vx = 0.0;
+    g.world.rockets[1].vy = 0.0;
     let mut outcome = Outcome::Playing;
     for _ in 0..3000 {
         // drive A toward its target pad (B's home, index 1) with the guidance law
@@ -169,7 +182,9 @@ fn landing_wins_once_opponent_destroyed() {
 }
 
 #[test]
-fn landing_wins_once_opponent_out_of_fuel() {
+fn landing_does_not_win_on_opponent_out_of_fuel() {
+    // Out of fuel is no longer a win condition: the opponent has to be dead. A dry
+    // but still-alive opponent keeps the game going.
     let mut cfg = Cfg::default();
     cfg.infinite_fuel = false;
     let mut g = Game::new(cfg);
@@ -178,8 +193,8 @@ fn landing_wins_once_opponent_out_of_fuel() {
     g.world.rockets[1].x = 16.0;
     g.world.rockets[1].y = 22.0;
     g.world.rockets[1].status = Status::Flying;
-    g.world.rockets[1].fuel = 0.0; // opponent out of fuel
-    assert_eq!(g.step(Action::default()), Outcome::AWins, "landed + opponent out of fuel wins");
+    g.world.rockets[1].fuel = 0.0; // opponent out of fuel but still alive
+    assert_eq!(g.step(Action::default()), Outcome::Playing, "out of fuel alone must not hand over a win");
 }
 
 #[test]
@@ -192,4 +207,170 @@ fn idle_burn_drains_fuel_without_thrust() {
     let f0 = g.world.rockets[0].fuel;
     g.step(Action::default()); // no thrust
     assert!(g.world.rockets[0].fuel < f0, "idle burn should drain fuel with zero thrust");
+}
+
+/// Reproduction sweep for the "landed dead-center but never goes stable" report.
+/// The opponent is already a wreck parked on the floor mid-arena (out of the way
+/// so it can't fall onto the player), and the player is dropped over the
+/// opponent's pad across small height / vertical-speed / tilt / offset
+/// perturbations, flying the same guidance autopilot the AI lands with. Every
+/// case should close out as a win; any that doesn't is collected and reported.
+#[test]
+fn lands_on_opponent_pad_under_small_perturbations() {
+    let mut cfg = Cfg::default();
+    cfg.infinite_fuel = true; // isolate the stable-landing logic from fuel
+
+    let heights = [0.0, 0.15, 0.4, 0.8]; // extra CoM height above a feet-on-deck pose
+    let vys = [0.0, -0.3, -0.8]; // initial vertical speed (downward)
+    let ths = [0.0, 0.08, -0.08, 0.15, -0.15]; // initial tilt (rad)
+    let dxs = [0.0, 1.2, -1.2]; // horizontal offset from pad center (m)
+
+    let foot_drop = cfg.com * cfg.h + cfg.leg_len * cfg.leg_splay.cos();
+    let mut failures = Vec::new();
+
+    for &dh in &heights {
+        for &vy in &vys {
+            for &th in &ths {
+                for &dx in &dxs {
+                    let mut g = Game::new(cfg);
+                    g.ai_enabled = false;
+
+                    // opponent: a wreck resting on the floor at mid-arena
+                    let b = &mut g.world.rockets[1];
+                    b.status = Status::Dead;
+                    b.x = 16.0;
+                    b.y = cfg.hull_r;
+                    b.vx = 0.0;
+                    b.vy = 0.0;
+                    b.th = 0.0;
+                    b.om = 0.0;
+
+                    // player: dropped over its target pad (A targets the right pad)
+                    let target = g.world.pads[g.world.rockets[0].target_pad];
+                    let a = &mut g.world.rockets[0];
+                    a.x = target.cx + dx;
+                    a.y = target.top() + foot_drop + 0.05 + dh;
+                    a.vx = 0.0;
+                    a.vy = vy;
+                    a.th = th;
+                    a.om = 0.0;
+
+                    // fly the guidance autopilot until the match is decided
+                    let mut outcome = Outcome::Playing;
+                    let mut steps = 0;
+                    while steps < 1800 {
+                        let a = g.rocket(Side::A);
+                        let target = g.world.pads[a.target_pad];
+                        let act = guide_to_pad_binary(&cfg, a, &target);
+                        outcome = g.step(act);
+                        steps += 1;
+                        if outcome != Outcome::Playing {
+                            break;
+                        }
+                    }
+                    if outcome != Outcome::AWins {
+                        let a = g.rocket(Side::A);
+                        failures.push(format!(
+                            "dh={dh} vy={vy} th={th} dx={dx} -> {outcome:?} after {steps} steps \
+                             (status={:?}, stable={:.2}s, |th|={:.3}, |om|={:.3}, speed={:.3})",
+                            a.status,
+                            a.stable_time,
+                            a.th.abs(),
+                            a.om.abs(),
+                            a.speed(),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "{} / {} perturbations failed to land and win:\n{}",
+        failures.len(),
+        heights.len() * vys.len() * ths.len() * dxs.len(),
+        failures.join("\n"),
+    );
+}
+
+/// Closer to the user's report: the player starts with its feet a little ABOVE
+/// the opponent's pad and free-falls onto it under gravity with ZERO control,
+/// the way a human who has cut the thrusters would. Conditions are deliberately
+/// mild (small gap, gentle touch, slight tilt/offset) so the touchdown is soft.
+/// Each drop should settle and win on its own; this catches a "rests but never
+/// goes stable" failure that an active autopilot could otherwise paper over.
+#[test]
+fn free_falls_onto_opponent_pad_and_settles() {
+    let mut cfg = Cfg::default();
+    cfg.infinite_fuel = true;
+
+    let gaps = [0.2, 0.5, 1.0]; // feet start this far above the deck (m)
+    let vys = [0.0, -0.5]; // start from rest, or a gentle nudge downward
+    let ths = [0.0, 0.03, -0.03]; // slight tilt (rad)
+    let dxs = [0.0, 0.6, -0.6]; // mild horizontal offset (both feet stay on deck)
+
+    let foot_drop = cfg.com * cfg.h + cfg.leg_len * cfg.leg_splay.cos();
+    let mut failures = Vec::new();
+
+    for &gap in &gaps {
+        for &vy in &vys {
+            for &th in &ths {
+                for &dx in &dxs {
+                    let mut g = Game::new(cfg);
+                    g.ai_enabled = false;
+
+                    let b = &mut g.world.rockets[1];
+                    b.status = Status::Dead;
+                    b.x = 16.0;
+                    b.y = cfg.hull_r;
+                    b.vx = 0.0;
+                    b.vy = 0.0;
+                    b.th = 0.0;
+                    b.om = 0.0;
+
+                    let target = g.world.pads[g.world.rockets[0].target_pad];
+                    let a = &mut g.world.rockets[0];
+                    a.x = target.cx + dx;
+                    a.y = target.top() + foot_drop + gap; // feet `gap` above the deck
+                    a.vx = 0.0;
+                    a.vy = vy;
+                    a.th = th;
+                    a.om = 0.0;
+                    a.legs_out = true;
+
+                    let mut outcome = Outcome::Playing;
+                    let mut steps = 0;
+                    while steps < 600 {
+                        // no input: pure free fall, then let it settle
+                        outcome = g.step(Action::default());
+                        steps += 1;
+                        if outcome != Outcome::Playing {
+                            break;
+                        }
+                    }
+                    if outcome != Outcome::AWins {
+                        let a = g.rocket(Side::A);
+                        failures.push(format!(
+                            "gap={gap} vy={vy} th={th} dx={dx} -> {outcome:?} after {steps} steps \
+                             (status={:?}, stable={:.2}s, |th|={:.3}, |om|={:.3}, speed={:.3})",
+                            a.status,
+                            a.stable_time,
+                            a.th.abs(),
+                            a.om.abs(),
+                            a.speed(),
+                        ));
+                    }
+                }
+            }
+        }
+    }
+
+    assert!(
+        failures.is_empty(),
+        "{} / {} free-fall drops failed to settle and win:\n{}",
+        failures.len(),
+        gaps.len() * vys.len() * ths.len() * dxs.len(),
+        failures.join("\n"),
+    );
 }

@@ -13,4 +13,11 @@ cp "$SRC/game.html"               "$DEST/game.html"
 cp "$SRC/game.js"                 "$DEST/game.js"
 cp "$SRC/pkg/rocket_wasm.js"      "$DEST/pkg/rocket_wasm.js"
 cp "$SRC/pkg/rocket_wasm_bg.wasm" "$DEST/pkg/rocket_wasm_bg.wasm"
-echo "✓ synced game into $DEST"
+
+# Cache-bust: stamp every `?v=dev` load token with a hash of the actual bundle,
+# so the browser refetches game.js / the wasm glue / the wasm exactly when one of
+# them changed, and keeps caching when nothing did. No manual version bumping.
+STAMP=$(cat "$DEST/game.html" "$DEST/game.js" "$DEST/pkg/rocket_wasm.js" \
+            "$DEST/pkg/rocket_wasm_bg.wasm" | shasum | cut -c1-10)
+sed -i '' "s/?v=dev/?v=$STAMP/g" "$DEST/game.html" "$DEST/game.js"
+echo "✓ synced game into $DEST (cache token v=$STAMP)"

@@ -128,13 +128,15 @@
       <!-- shared tuning: solo shows it always; vs reveals it with "Display tuning" -->
       <div id="tunePanel" style="display:none">
         <h2 class="lbl">Tuning</h2>
-        <div class="slider"><label>mass <b><span id="lm">1.80</span> kg</b></label><input type="range" id="sm" min="0.3" max="4" step="0.05" value="1.8"></div>
-        <div class="slider"><label>thrust / booster <b><span id="lt">31</span> N</b></label><input type="range" id="st" min="5" max="60" step="1" value="31"></div>
+        <div class="slider"><label>mass <b><span id="lm">1.40</span> kg</b></label><input type="range" id="sm" min="0.3" max="4" step="0.05" value="1.4"></div>
+        <div class="slider"><label>thrust / booster <b><span id="lt">29</span> N</b></label><input type="range" id="st" min="5" max="60" step="1" value="29"></div>
         <div class="slider"><label>booster offset d <b><span id="ld">0.28</span> m</b></label><input type="range" id="sd" min="0.05" max="0.6" step="0.01" value="0.28"></div>
-        <div class="slider"><label>inertia scale <b><span id="li">3.30</span>×</b></label><input type="range" id="si" min="0.2" max="4" step="0.05" value="3.3"></div>
-        <div class="slider"><label>leg stiffness k <b><span id="lk">400</span></b></label><input type="range" id="sk" min="200" max="2500" step="50" value="400"></div>
-        <div class="slider"><label>leg damping c <b><span id="lc">30</span></b></label><input type="range" id="sc" min="5" max="200" step="5" value="30"></div>
-        <div class="slider"><label>friction μ <b><span id="lmu">0.22</span></b></label><input type="range" id="smu" min="0.1" max="2.5" step="0.01" value="0.22"></div>
+        <div class="slider"><label>inertia scale <b><span id="li">2.10</span>×</b></label><input type="range" id="si" min="0.2" max="4" step="0.05" value="2.1"></div>
+        <div class="slider"><label>CoM (engine→nose) <b><span id="lcom">0.20</span></b></label><input type="range" id="scom" min="0.2" max="0.8" step="0.05" value="0.2"></div>
+        <div class="slider"><label>leg stiffness k <b><span id="lk">1000</span></b></label><input type="range" id="sk" min="200" max="2500" step="50" value="1000"></div>
+        <div class="slider"><label>leg damping c <b><span id="lc">50</span></b></label><input type="range" id="sc" min="5" max="200" step="5" value="50"></div>
+        <div class="slider"><label>friction μ <b><span id="lmu">0.39</span></b></label><input type="range" id="smu" min="0.1" max="2.5" step="0.01" value="0.39"></div>
+        <div class="slider"><label>explode speed (m/s) <b><span id="lve">5.0</span></b></label><input type="range" id="sve" min="1" max="15" step="0.5" value="5"></div>
         <div class="slider"><label>infinite fuel <b><span id="lif">off</span></b></label><input type="range" id="sif" min="0" max="1" step="1" value="0"></div>
         <div id="collisionTune">
           <div class="slider"><label>bounce (restitution) <b><span id="restVal">0.35</span></b></label><input type="range" id="rest" min="0" max="1" step="0.05" value="0.35"></div>
@@ -181,6 +183,6 @@
       throw new Error('opened via file://, serve over http instead');
     }
   </script>
-  <script type="module" src="./game.js?v=14"></script>
+  <script type="module" src="./game.js?v=dev"></script>
 </body>
 </html>

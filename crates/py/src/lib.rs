@@ -81,6 +81,7 @@ fn apply_kwargs(cfg: &mut Cfg, kwargs: Option<&Bound<'_, PyDict>>) -> PyResult<(
             "d" => f!(d),
             "tmax" => f!(tmax),
             "i_scale" => f!(i_scale),
+            "com" => f!(com),
             "fuel_max" => f!(fuel_max),
             "fuel_rate" => f!(fuel_rate),
             "fuel_idle_rate" => f!(fuel_idle_rate),
@@ -153,6 +154,7 @@ impl Config {
         d.set_item("d", c.d)?;
         d.set_item("tmax", c.tmax)?;
         d.set_item("i_scale", c.i_scale)?;
+        d.set_item("com", c.com)?;
         d.set_item("fuel_max", c.fuel_max)?;
         d.set_item("fuel_rate", c.fuel_rate)?;
         d.set_item("fuel_idle_rate", c.fuel_idle_rate)?;

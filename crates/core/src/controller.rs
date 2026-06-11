@@ -30,7 +30,7 @@ pub fn guide_to_pad(cfg: &Cfg, r: &Rocket, pad: &Pad) -> Action {
     // --- vertical: hold high while traversing, descend slowly once aligned. ---
     // The legs hang `foot_drop` below the CoM, so to set the FEET on the deck we
     // aim the CoM that much higher (with a touch of penetration to settle).
-    let foot_drop = cfg.h * 0.5 + cfg.leg_len * cfg.leg_splay.cos();
+    let foot_drop = cfg.com * cfg.h + cfg.leg_len * cfg.leg_splay.cos();
     let aim_y = if aligned { pad.top() + foot_drop - 0.05 } else { pad.y + 5.0 };
     let ey = aim_y - r.y;
     let vy_des = (0.6 * ey).clamp(-1.5, 2.0); // limit descent rate for control authority

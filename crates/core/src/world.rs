@@ -131,6 +131,15 @@ impl Rocket {
         self.status == Status::Flying
     }
 
+    /// Physically present for contact resolution. A flying craft and a tumbling
+    /// wreck both shove on the pads and on each other, so a dead rocket keeps
+    /// blocking the arena (you have to land around it). Only a parked `Landed`
+    /// craft is treated as inert and skipped.
+    #[inline]
+    pub fn collidable(&self) -> bool {
+        self.status != Status::Landed
+    }
+
     /// True once the tank is empty. With `infinite_fuel` set, fuel never drops,
     /// so this stays false.
     #[inline]
@@ -160,11 +169,11 @@ impl Rocket {
     /// Hull as a capsule: bottom (engine end) and top (nose end) centreline pts.
     #[inline]
     pub fn hull_bottom(&self, cfg: &Cfg) -> Vec2 {
-        self.to_world(0.0, -cfg.h * 0.5)
+        self.to_world(0.0, cfg.bottom_off())
     }
     #[inline]
     pub fn hull_top(&self, cfg: &Cfg) -> Vec2 {
-        self.to_world(0.0, cfg.h * 0.5)
+        self.to_world(0.0, cfg.top_off())
     }
 
     /// The two kickstand foot positions in world space.
@@ -177,7 +186,7 @@ impl Rocket {
         for (i, sign) in [-1.0f64, 1.0].into_iter().enumerate() {
             // attach at the lower corner
             let cx = sign * cfg.w * 0.5;
-            let cy = -cfg.h * 0.5;
+            let cy = cfg.bottom_off();
             // leg direction in body frame: down (−y) tilted outward by splay
             let (ss, cs) = cfg.leg_splay.sin_cos();
             let fx = cx + cfg.leg_len * sign * ss;
@@ -280,22 +289,32 @@ pub fn step_isolated(cfg: &Cfg, pad: &Pad, r: &mut Rocket, action: Action) {
 /// pad + world bounds). Rocket–rocket contact is handled separately.
 fn integrate(cfg: &Cfg, pads: &[Pad], r: &mut Rocket, action: Action) {
     match r.status {
-        // A landed rocket has settled on a pad; leave it put. The idle fuel drain
-        // still ticks, so parking on a pad can't stall the match clock, and a
-        // both-landed standoff (neither side neutralized) resolves once one tank
-        // runs dry.
+        // A rocket settled on a pad. The match may still be live: you only win
+        // once the opponent is dead, so you're free to throttle back up and lift
+        // off to go finish them. With no thrust (or a dry tank) it stays parked and
+        // the idle drain keeps ticking; running dry won't win it, it just leaves
+        // you unable to maneuver.
         Status::Landed => {
-            if !cfg.infinite_fuel {
-                r.fuel -= cfg.fuel_idle_rate * cfg.dt;
-                if r.fuel < 0.0 {
-                    r.fuel = 0.0;
+            let lifting_off =
+                (action.tl + action.tr) > 0.0 && (cfg.infinite_fuel || r.fuel > 0.0);
+            if lifting_off {
+                r.status = Status::Flying;
+                r.stable_time = 0.0;
+                // fall through into the flying integration below
+            } else {
+                if !cfg.infinite_fuel {
+                    r.fuel -= cfg.fuel_idle_rate * cfg.dt;
+                    if r.fuel < 0.0 {
+                        r.fuel = 0.0;
+                    }
                 }
+                return;
             }
-            return;
         }
         // A wreck keeps tumbling under gravity instead of freezing: no thrust,
         // no legs, no control, just the linear and angular momentum it died with.
-        // It grinds to rest once it reaches the ground.
+        // It grinds to rest once it reaches the ground; pad and rocket contact
+        // (so the wreck still blocks the arena) is resolved in the collision pass.
         Status::Dead => {
             r.vy += cfg.g * cfg.dt;
             r.x += r.vx * cfg.dt;
@@ -371,7 +390,9 @@ fn integrate(cfg: &Cfg, pads: &[Pad], r: &mut Rocket, action: Action) {
                 if !p.over(f.x) || pen <= 0.0 || f.y < p.y {
                     continue; // not over the pad, or outside the slab band
                 }
-                max_foot_impact = max_foot_impact.max(vf.len());
+                // vertical descent speed only: a hard straight-down touchdown
+                // can crush a leg, but a fast horizontal slide or spin does not.
+                max_foot_impact = max_foot_impact.max(vf.y.abs());
 
                 // spring + damper, clamped non-negative so the foot is only ever
                 // pushed up out of the deck.
@@ -427,7 +448,7 @@ fn integrate(cfg: &Cfg, pads: &[Pad], r: &mut Rocket, action: Action) {
         return;
     }
 
-    // --- termination: hard foot impact ---
+    // --- termination: hard foot impact (vertical descent speed) ---
     if max_foot_impact > cfg.v_explode {
         die(r, DeathCause::FootImpact);
         return;
@@ -508,7 +529,7 @@ fn resolve_rocket_collisions(cfg: &Cfg, rockets: &mut [Rocket]) {
 
     for i in 0..n {
         for j in (i + 1)..n {
-            if !rockets[i].alive() || !rockets[j].alive() {
+            if !rockets[i].collidable() || !rockets[j].collidable() {
                 continue;
             }
 
@@ -589,10 +610,10 @@ fn resolve_rocket_collisions(cfg: &Cfg, rockets: &mut [Rocket]) {
 
             // --- gated destruction (bottom half + hard enough) ---
             if hard {
-                if i_bottom {
+                if i_bottom && rockets[i].alive() {
                     die(&mut rockets[i], DeathCause::RocketHit);
                 }
-                if j_bottom {
+                if j_bottom && rockets[j].alive() {
                     die(&mut rockets[j], DeathCause::RocketHit);
                 }
             }
@@ -619,7 +640,7 @@ fn resolve_pad_collisions(cfg: &Cfg, rockets: &mut [Rocket], pads: &[Pad]) {
     let inv_m = 1.0 / cfg.m;
     let inv_i = 1.0 / cfg.inertia();
     for r in rockets.iter_mut() {
-        if !r.alive() {
+        if !r.collidable() {
             continue;
         }
         for p in pads {
@@ -677,7 +698,7 @@ fn resolve_pad_collisions(cfg: &Cfg, rockets: &mut [Rocket], pads: &[Pad]) {
             }
             // gated destruction: a hard hit on the engine (bottom) half kills;
             // the gold nose is invincible.
-            if impact >= cfg.rocket_crush_speed && in_bottom_half(cp_h, h0, h1) {
+            if r.alive() && impact >= cfg.rocket_crush_speed && in_bottom_half(cp_h, h0, h1) {
                 die(r, DeathCause::BodySlam);
             }
         }

@@ -42,6 +42,7 @@ struct RenderState {
     deploy_r: f64,
     body_w: f64,
     body_h: f64,
+    com: f64,
     hull_r: f64,
     time: f64,
     outcome: String, // "playing" | "a_wins" | "b_wins" | "draw" | "" (sandbox)
@@ -89,6 +90,7 @@ fn render_state(world: &World, outcome: &str, owners: &[u8]) -> RenderState {
         deploy_r: cfg.deploy_r,
         body_w: cfg.w,
         body_h: cfg.h,
+        com: cfg.com,
         hull_r: cfg.hull_r,
         time: world.time,
         outcome: outcome.into(),
@@ -189,9 +191,11 @@ impl Sim {
             "tmax" => c.tmax = value,
             "d" => c.d = value,
             "i_scale" => c.i_scale = value,
+            "com" => c.com = value,
             "leg_k" => c.leg_k = value,
             "leg_c" => c.leg_c = value,
             "leg_mu" => c.leg_mu = value,
+            "v_explode" => c.v_explode = value,
             "infinite_fuel" => c.infinite_fuel = value != 0.0,
             _ => {}
         }
@@ -204,9 +208,11 @@ impl Sim {
             "tmax" => c.tmax,
             "d" => c.d,
             "i_scale" => c.i_scale,
+            "com" => c.com,
             "leg_k" => c.leg_k,
             "leg_c" => c.leg_c,
             "leg_mu" => c.leg_mu,
+            "v_explode" => c.v_explode,
             "infinite_fuel" => if c.infinite_fuel { 1.0 } else { 0.0 },
             _ => 0.0,
         }
@@ -315,8 +321,8 @@ impl GameSim {
     }
 
     /// Tweak a parameter live. Collision: "rocket_restitution", "rocket_crush_speed".
-    /// Body/legs (shared by both rockets): "m", "tmax", "d", "i_scale", "leg_k",
-    /// "leg_c", "leg_mu", "infinite_fuel".
+    /// Body/legs (shared by both rockets): "m", "tmax", "d", "i_scale", "com",
+    /// "leg_k", "leg_c", "leg_mu", "v_explode", "infinite_fuel".
     pub fn set_param(&mut self, name: &str, value: f64) {
         let c = &mut self.game.world.cfg;
         match name {
@@ -326,9 +332,11 @@ impl GameSim {
             "tmax" => c.tmax = value,
             "d" => c.d = value,
             "i_scale" => c.i_scale = value,
+            "com" => c.com = value,
             "leg_k" => c.leg_k = value,
             "leg_c" => c.leg_c = value,
             "leg_mu" => c.leg_mu = value,
+            "v_explode" => c.v_explode = value,
             "infinite_fuel" => c.infinite_fuel = value != 0.0,
             _ => {}
         }
@@ -343,9 +351,11 @@ impl GameSim {
             "tmax" => c.tmax,
             "d" => c.d,
             "i_scale" => c.i_scale,
+            "com" => c.com,
             "leg_k" => c.leg_k,
             "leg_c" => c.leg_c,
             "leg_mu" => c.leg_mu,
+            "v_explode" => c.v_explode,
             "infinite_fuel" => if c.infinite_fuel { 1.0 } else { 0.0 },
             _ => 0.0,
         }
