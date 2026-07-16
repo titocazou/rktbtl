@@ -316,6 +316,60 @@ impl Sim {
     fn observation<'py>(&self, py: Python<'py>) -> Bound<'py, PyArray1<f64>> {
         self.obs(py)
     }
+
+    /// Full render snapshot as a dict, mirroring the wasm `render_state` field
+    /// for field (same names, same world-space leg/hull geometry), so replay
+    /// tooling can reuse the game's JS renderer without recomputing the pose.
+    fn snapshot<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let cfg = &self.world.cfg;
+        let d = PyDict::new_bound(py);
+        d.set_item("world_w", cfg.world_w)?;
+        d.set_item("world_h", cfg.world_h)?;
+        d.set_item("deploy_r", cfg.deploy_r)?;
+        d.set_item("body_w", cfg.w)?;
+        d.set_item("body_h", cfg.h)?;
+        d.set_item("com", cfg.com)?;
+        d.set_item("hull_r", cfg.hull_r)?;
+        d.set_item("time", self.world.time)?;
+        d.set_item("outcome", "")?;
+
+        let r = &self.world.rockets[0];
+        let feet = r.feet(cfg);
+        let attach = r.leg_attach_points(cfg);
+        let top = r.hull_top(cfg);
+        let bottom = r.hull_bottom(cfg);
+        let rv = PyDict::new_bound(py);
+        rv.set_item("x", r.x)?;
+        rv.set_item("y", r.y)?;
+        rv.set_item("th", r.th)?;
+        rv.set_item("vx", r.vx)?;
+        rv.set_item("vy", r.vy)?;
+        rv.set_item("om", r.om)?;
+        rv.set_item("fuel", r.fuel)?;
+        rv.set_item("status", status_str(r.status))?;
+        rv.set_item("death_cause", death_str(r.death_cause))?;
+        rv.set_item("legs_out", r.legs_out)?;
+        rv.set_item("stable_time", r.stable_time)?;
+        rv.set_item("side", 0u8)?;
+        rv.set_item("feet", vec![vec![feet[0].x, feet[0].y], vec![feet[1].x, feet[1].y]])?;
+        rv.set_item(
+            "attach",
+            vec![vec![attach[0].x, attach[0].y], vec![attach[1].x, attach[1].y]],
+        )?;
+        rv.set_item("top", vec![top.x, top.y])?;
+        rv.set_item("bottom", vec![bottom.x, bottom.y])?;
+        d.set_item("rockets", vec![rv])?;
+
+        let p = &self.world.pads[0];
+        let pv = PyDict::new_bound(py);
+        pv.set_item("cx", p.cx)?;
+        pv.set_item("y", p.y)?;
+        pv.set_item("half_w", p.half_w)?;
+        pv.set_item("thick", p.thick)?;
+        pv.set_item("owner", 0u8)?;
+        d.set_item("pads", vec![pv])?;
+        Ok(d)
+    }
 }
 
 impl Sim {
